@@ -709,6 +709,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const totalBajasGeneral = todasBajas.reduce((s, b) => s + (+b.monto || 0), 0);
   const todosBonos = cajaHistorial.flatMap(c => (c.bonos || []).map(b => ({ ...b, fecha: c.fecha, turnoLabel: c.turnoLabel, empleado: c.empleado_nombre })));
   const totalBonosGeneral = todosBonos.reduce((s, b) => s + (+b.monto || 0), 0);
+  const rankingEmpleados = empleados.map(emp => { const empCajas = cajaHistorial.filter(c => c.empleado_nombre === emp.nombre); const difNeg = empCajas.filter(c => (c.dif || 0) < -100).length; const difTotal = empCajas.reduce((s, c) => s + Math.abs(c.dif || 0), 0); const totalBonos = todosBonos.filter(b => b.empleado === emp.nombre).reduce((s, b) => s + (+b.monto || 0), 0); return { ...emp, turnos: empCajas.length, difNeg, difTotal, totalBonos }; }).filter(e => e.turnos > 0).sort((a, b) => b.difTotal - a.difTotal);
 
   if (!config) return <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 36 }}>🎰</div>Cargando...</div></div>;
 
