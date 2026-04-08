@@ -534,6 +534,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [cajaComment, setCajaComment] = useState({});
   const [selectedDay, setSelectedDay] = useState(todayStr());
   const [empHistoryId, setEmpHistoryId] = useState(null);
+  const [jugSeg, setJugSeg] = useState(null);
+  const [jugFiltro, setJugFiltro] = useState("");
   const fileRef = useRef();
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2800); };
 
@@ -719,7 +721,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
     { id: "bonos", label: "🎁 Bonos" }, { id: "bajas", label: "📤 Bajas" },
     { id: "importar", label: "📂 Importar" }, { id: "cargar", label: editId ? "✏️ Editar" : "➕ Panel" },
     { id: "historial", label: "📋 Historial" }, { id: "campana", label: "📣 Campaña" },
-    { id: "empleados_hist", label: "👤 Empleados" }, { id: "ajustes", label: "⚙️ Ajustes" },
+    { id: "meses", label: "📆 Meses" }, { id: "empleados_hist", label: "👤 Empleados" }, { id: "ajustes", label: "⚙️ Ajustes" },
   ];
 
   const CajaBajas = ({ formState, setFormState }) => {
@@ -977,24 +979,80 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "jugadores" && (
           <div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c084fc" }}>👥 Jugadores</h2>
-            <p style={{ color: "#7c6fa0", fontSize: 12, marginBottom: 20 }}>Primera aparición en el historial.</p>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#9f67ff" }}>👥 Jugadores</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
               {[{ label: "Nuevos este mes", value: cmNuevos, color: "#fbbf24", icon: "🆕" }, { label: "Nuevos mes pasado", value: pmNuevos, color: "#a78bfa", icon: "📅" }, { label: "Activos este mes", value: cmUnicos, color: "#38bdf8", icon: "🎮" }, { label: "Total historial", value: totalPlayers, color: "#4ade80", icon: "📁" }].map(s => (
-                <div key={s.label} style={S.card}><div style={{ fontSize: 18, marginBottom: 6 }}>{s.icon}</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 4 }}>{s.label}</div></div>
+                <div key={s.label} style={S.card}><div style={{ fontSize: 18, marginBottom: 6 }}>{s.icon}</div><div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>{s.label}</div></div>
               ))}
             </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+              {[
+                { label: "💪 Cargas fuertes", sub: "+$15.000", seg: "fuerte", color: "#4ade80", border: "rgba(74,222,128,0.25)", count: jugadores.filter(j => (j.total_mes||0) >= 15000).length },
+                { label: "📊 Cargas medias", sub: "$5.000 – $15.000", seg: "media", color: "#fbbf24", border: "rgba(251,191,36,0.25)", count: jugadores.filter(j => (j.total_mes||0) >= 5000 && (j.total_mes||0) < 15000).length },
+                { label: "🔻 Cargas bajas", sub: "Hasta $5.000", seg: "baja", color: "#f87171", border: "rgba(248,113,113,0.25)", count: jugadores.filter(j => (j.total_mes||0) > 0 && (j.total_mes||0) < 5000).length },
+                { label: "🔥 Alta frecuencia", sub: "5+ cargas este mes", seg: "frecuente", color: "#a78bfa", border: "rgba(167,139,250,0.25)", count: jugadores.filter(j => (j.frecuencia_mes||0) >= 5).length },
+              ].map(seg => (
+                <div key={seg.seg} onClick={() => setJugSeg(jugSeg === seg.seg ? null : seg.seg)} style={{ ...S.card, borderColor: jugSeg === seg.seg ? seg.border : C.border, cursor: "pointer", background: jugSeg === seg.seg ? "rgba(255,255,255,0.03)" : C.card }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: seg.color, marginBottom: 4 }}>{seg.label}</div>
+                  <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>{seg.sub}</div>
+                  <div style={{ fontSize: 30, fontWeight: 800, color: seg.color }}>{seg.count}</div>
+                  <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>jugadores</div>
+                </div>
+              ))}
+            </div>
+            {jugSeg && (
+              <div style={{ ...S.card, marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9f67ff" }}>
+                    {jugSeg === "fuerte" ? "💪 Cargas fuertes (+$15.000)" : jugSeg === "media" ? "📊 Cargas medias ($5.000 – $15.000)" : jugSeg === "baja" ? "🔻 Cargas bajas (hasta $5.000)" : "🔥 Alta frecuencia (5+ cargas)"}
+                  </div>
+                  <button onClick={() => setJugSeg(null)} style={S.ghost}>✕ Cerrar</button>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <input type="text" placeholder="Buscar jugador..." value={jugFiltro} onChange={e => setJugFiltro(e.target.value)} style={{ ...S.input, fontSize: 13 }} />
+                </div>
+                {jugadores.filter(j => {
+                  const ok = jugSeg === "fuerte" ? (j.total_mes||0) >= 15000 : jugSeg === "media" ? (j.total_mes||0) >= 5000 && (j.total_mes||0) < 15000 : jugSeg === "baja" ? (j.total_mes||0) > 0 && (j.total_mes||0) < 5000 : (j.frecuencia_mes||0) >= 5;
+                  return ok && (!jugFiltro || j.nombre.toLowerCase().includes(jugFiltro.toLowerCase()));
+                }).length === 0 ? (
+                  <div style={{ color: "#475569", textAlign: "center", padding: 24 }}>No hay jugadores en este segmento todavía.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {jugadores.filter(j => {
+                      const ok = jugSeg === "fuerte" ? (j.total_mes||0) >= 15000 : jugSeg === "media" ? (j.total_mes||0) >= 5000 && (j.total_mes||0) < 15000 : jugSeg === "baja" ? (j.total_mes||0) > 0 && (j.total_mes||0) < 5000 : (j.frecuencia_mes||0) >= 5;
+                      return ok && (!jugFiltro || j.nombre.toLowerCase().includes(jugFiltro.toLowerCase()));
+                    }).map(j => (
+                      <div key={j.nombre} style={{ background: "#0a0a14", border: "1px solid #1e1e38", borderRadius: 12, padding: "13px 16px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {j.nombre}</div>
+                            <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>Primera vez: {j.primera_vez || "—"}{j.telefono ? ` · 📱 ${j.telefono}` : ""}</div>
+                          </div>
+                          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                            {j.telefono ? (
+                              <span style={{ fontSize: 12, color: "#4ade80" }}>📱 {j.telefono}</span>
+                            ) : (
+                              <input type="text" placeholder="+ teléfono" style={{ ...S.input, width: 130, fontSize: 12, padding: "6px 10px" }}
+                                onBlur={async e => { if (e.target.value) { await supabase.from("jugadores").update({ telefono: e.target.value }).eq("tenant_id", tid).eq("nombre", j.nombre); loadAll(); } }} />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {(cmNuevos > 0 || pmNuevos > 0) && (
               <div style={{ ...S.card, marginBottom: 20 }}>
                 <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 14 }}>Nuevos: mes a mes</div>
                 {[{ label: monthLabel(-1), value: pmNuevos, color: "#78350f", tc: "#a78bfa" }, { label: monthLabel(), value: cmNuevos, color: "linear-gradient(90deg,#d97706,#fbbf24)", tc: "#fbbf24" }].map(row => (
                   <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, color: "#7c6fa0", width: 90, textTransform: "capitalize", flexShrink: 0 }}>{row.label}</div>
-                    <div style={{ flex: 1, background: "#2a1f4a", borderRadius: 100, height: 10 }}><div style={{ background: row.color, borderRadius: 100, height: 10, width: `${Math.max(cmNuevos, pmNuevos) > 0 ? (row.value / Math.max(cmNuevos, pmNuevos)) * 100 : 0}%`, transition: "width 1s ease" }} /></div>
-                    <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: row.tc, width: 28, textAlign: "right" }}>{row.value}</div>
+                    <div style={{ fontSize: 11, color: "#475569", width: 90, textTransform: "capitalize", flexShrink: 0 }}>{row.label}</div>
+                    <div style={{ flex: 1, background: "#1e1e38", borderRadius: 100, height: 8 }}><div style={{ background: row.color, borderRadius: 100, height: 8, width: `${Math.max(cmNuevos, pmNuevos) > 0 ? (row.value / Math.max(cmNuevos, pmNuevos)) * 100 : 0}%`, transition: "width 1s ease" }} /></div>
+                    <div style={{ fontWeight: 800, color: row.tc, width: 28, textAlign: "right" }}>{row.value}</div>
                   </div>
                 ))}
-                {pmNuevos > 0 && <div style={{ marginTop: 12, padding: "10px 14px", background: "#0a0a0f", borderRadius: 10, fontSize: 13 }}>{cmNuevos > pmNuevos ? <span>📈 <span style={{ color: "#4ade80", fontWeight: 700 }}>+{cmNuevos - pmNuevos} más</span> que el mes pasado</span> : cmNuevos < pmNuevos ? <span>📉 <span style={{ color: "#f87171", fontWeight: 700 }}>{cmNuevos - pmNuevos} menos</span> que el mes pasado</span> : <span style={{ color: "#94a3b8" }}>Igual que el mes pasado</span>}</div>}
               </div>
             )}
             {cmEntries.some(e => e.jugadores_nuevos > 0) && (
@@ -1003,9 +1061,9 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {cmEntries.filter(e => e.jugadores_nuevos > 0).map(entry => (
                     <div key={entry.fecha}>
-                      <div onClick={() => setExpandedDay(expandedDay === entry.fecha ? null : entry.fecha)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#0d0a1a", borderRadius: 10, cursor: "pointer", border: "1px solid #1a1530" }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}><span style={{ color: "#a78bfa", fontSize: 13, fontWeight: 600 }}>{new Date(entry.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span></div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: "#fbbf24", fontSize: 16 }}>+{entry.jugadores_nuevos}</span></div>
+                      <div onClick={() => setExpandedDay(expandedDay === entry.fecha ? null : entry.fecha)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#0a0a14", borderRadius: 10, cursor: "pointer", border: "1px solid #1e1e38" }}>
+                        <span style={{ color: "#a78bfa", fontSize: 13, fontWeight: 600 }}>{new Date(entry.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
+                        <span style={{ fontWeight: 800, color: "#fbbf24", fontSize: 16 }}>+{entry.jugadores_nuevos}</span>
                       </div>
                       {expandedDay === entry.fecha && (entry.jugadores_nuevos_lista || []).length > 0 && (<div style={{ background: "#0a0812", border: "1px solid #1a1530", borderTop: "none", borderRadius: "0 0 10px 10px", padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>{(entry.jugadores_nuevos_lista || []).map(j => <span key={j} style={{ background: "#1a1225", border: "1px solid #3b2a5a", borderRadius: 20, padding: "3px 12px", fontSize: 12, color: "#c084fc" }}>👤 {j}</span>)}</div>)}
                     </div>
@@ -1155,6 +1213,75 @@ const OwnerDashboard = ({ session, onLogout }) => {
               </div>
               <button onClick={saveCamp} style={S.btn}>Guardar</button>
             </div>
+          </div>
+        )}
+
+        {activeTab === "meses" && (
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#9f67ff" }}>📆 Historial por Mes</h2>
+            {(() => {
+              const mesesData = {};
+              entries.forEach(e => {
+                const mes = e.fecha.slice(0, 7);
+                if (!mesesData[mes]) mesesData[mes] = { mes, cargas: 0, retiros: 0, neto: 0, dias: 0, jugNuevos: 0, jugUnicos: 0 };
+                mesesData[mes].cargas += e.cargas || 0;
+                mesesData[mes].retiros += e.retiros || 0;
+                mesesData[mes].neto += (e.cargas || 0) - (e.retiros || 0);
+                mesesData[mes].dias += 1;
+                mesesData[mes].jugNuevos += e.jugadores_nuevos || 0;
+                mesesData[mes].jugUnicos += e.jugadoresUnicos || 0;
+              });
+              const lista = Object.values(mesesData).sort((a,b) => b.mes.localeCompare(a.mes));
+              if (lista.length === 0) return <div style={{ ...S.card, textAlign: "center", padding: 40, color: "#475569" }}>No hay datos todavía. Importá CSVs para ver el historial mensual.</div>;
+              const maxNeto = Math.max(...lista.map(m => Math.abs(m.neto)), 1);
+              return (
+                <div>
+                  <div style={{ ...S.card, marginBottom: 20 }}>
+                    <div style={{ fontSize: 12, color: "#9f67ff", fontWeight: 700, marginBottom: 16 }}>Evolución mensual</div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <AreaChart data={[...lista].reverse()} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                        <defs>
+                          <linearGradient id="gCargas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/><stop offset="95%" stopColor="#4ade80" stopOpacity={0}/></linearGradient>
+                          <linearGradient id="gRetiros" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e1e38" />
+                        <XAxis dataKey="mes" tick={{ fill: "#475569", fontSize: 11 }} />
+                        <YAxis tick={{ fill: "#475569", fontSize: 11 }} tickFormatter={v => "$"+Math.round(v/1000)+"k"} />
+                        <Tooltip formatter={(v, n) => [fmt(v), n === "cargas" ? "Cargas" : "Retiros"]} contentStyle={{ background: "#0e0e1a", border: "1px solid #1e1e38", borderRadius: 10 }} />
+                        <Area type="monotone" dataKey="cargas" stroke="#4ade80" fill="url(#gCargas)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="retiros" stroke="#f87171" fill="url(#gRetiros)" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {lista.map((m, i) => {
+                      const prev = lista[i+1];
+                      const diff = prev ? m.neto - prev.neto : 0;
+                      const mesLabel = new Date(m.mes + "-15").toLocaleString("es-AR", { month: "long", year: "numeric" });
+                      return (
+                        <div key={m.mes} style={{ ...S.card }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9", textTransform: "capitalize" }}>{mesLabel}</div>
+                              <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{m.dias} días · {m.jugNuevos} nuevos · {m.jugUnicos} únicos</div>
+                            </div>
+                            <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Cargas</div><div style={{ color: "#4ade80", fontWeight: 700, fontSize: 14 }}>{fmt(m.cargas)}</div></div>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Retiros</div><div style={{ color: "#f87171", fontWeight: 700, fontSize: 14 }}>{fmt(m.retiros)}</div></div>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Neto</div><div style={{ color: m.neto >= 0 ? "#4ade80" : "#f87171", fontWeight: 800, fontSize: 18 }}>{fmt(m.neto)}</div></div>
+                              {prev && <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>vs ant.</div><div style={{ color: diff >= 0 ? "#4ade80" : "#f87171", fontWeight: 700, fontSize: 13 }}>{diff >= 0 ? "+" : ""}{fmt(diff)}</div></div>}
+                            </div>
+                          </div>
+                          <div style={{ background: "#07070f", borderRadius: 8, height: 6 }}>
+                            <div style={{ background: m.neto >= 0 ? "linear-gradient(90deg,#059669,#4ade80)" : "linear-gradient(90deg,#dc2626,#f87171)", borderRadius: 8, height: 6, width: `${Math.min((Math.abs(m.neto)/maxNeto)*100, 100)}%`, transition: "width 1s ease" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
