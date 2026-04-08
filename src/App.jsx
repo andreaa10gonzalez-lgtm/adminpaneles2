@@ -34,10 +34,10 @@ const sumK = (arr, k) => arr.reduce((s, e) => s + (e[k] || 0), 0);
 const cajaKey = (date, tid) => `${date}__${tid}`;
 const getHorarioLabel = (session) => {
   const diaHoy = DIA_MAP[new Date().getDay()];
-  const horDia = (session.horarios || {})[diaHoy + "_ini"] || "";
-  const horFin = (session.horarios || {})[diaHoy + "_fin"] || "";
-  if (horDia) return `${horDia}${horFin ? " – " + horFin : ""}`;
-  if (session.horario_inicio) return `${session.horario_inicio}${session.horario_fin ? " – " + session.horario_fin : ""}`;
+  const hd = session.horarios_dia || session.horarios || {};
+  const horIni = hd[diaHoy + "_ini"] || session.horario_inicio || "";
+  const horFin = hd[diaHoy + "_fin"] || session.horario_fin || "";
+  if (horIni) return `${horIni}${horFin ? " – " + horFin : ""}`;
   return "Mi turno";
 };
 const calcCaja = (caja, bills) => {
@@ -590,10 +590,11 @@ const OwnerDashboard = ({ session, onLogout }) => {
     if (!newEmpForm.nombre || !newEmpForm.usuario || !newEmpForm.pass) return showToast("⚠️ Completá nombre, usuario y contraseña");
     const { data: existing } = await supabase.from("empleados").select("id").eq("usuario", newEmpForm.usuario).single();
     if (existing) return showToast("⚠️ Ese usuario ya existe");
-    await db.addEmpleado({ id: `e_${Date.now()}`, tenant_id: tid, ...newEmpForm, activo: true });
+    const { nombre, usuario, pass, dias, horarios_dia } = newEmpForm;
+    await db.addEmpleado({ id: `e_${Date.now()}`, tenant_id: tid, nombre, usuario, pass, dias: dias || [], horarios_dia: horarios_dia || {}, activo: true });
     setEmpleados(await db.getEmpleados(tid));
-    setNewEmpForm({ nombre: "", usuario: "", pass: "", turno: "t1", dias: DIAS.map(d => d.id), horarios: {} });
-    showToast(`✅ ${newEmpForm.nombre} agregado`);
+    setNewEmpForm({ nombre: "", usuario: "", pass: "", dias: DIAS.map(d => d.id), horarios_dia: {} });
+    showToast(`✅ ${nombre} agregado`);
   };
   const toggleEmp = async (id, activo) => { await db.updateEmpleado(id, { activo: !activo }); setEmpleados(await db.getEmpleados(tid)); };
   const delEmp = async id => { await db.deleteEmpleado(id); setEmpleados(await db.getEmpleados(tid)); };
@@ -615,8 +616,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const saveCaja = async () => {
     if (!cajaForm.empleado) return showToast("⚠️ Seleccioná un empleado");
     const emp = empleados.find(e => e.nombre === cajaForm.empleado);
-    const horIni = emp?.horario_inicio || "";
-    const horFin = emp?.horario_fin || "";
+    const diaHoy = DIA_MAP[new Date(cajaForm.date + "T12:00:00").getDay()];
+    const hd = emp?.horarios_dia || {};
+    const horIni = hd[diaHoy + "_ini"] || emp?.horario_inicio || "";
+    const horFin = hd[diaHoy + "_fin"] || emp?.horario_fin || "";
     const turnoLabel = horIni ? `${horIni}${horFin ? " – " + horFin : ""}` : "Turno";
     const turnoId = `${cajaForm.date}_${cajaForm.empleado.replace(/\s+/g, "_")}`;
     const { error } = await db.upsertCaja({ tenant_id: tid, fecha: cajaForm.date, turno_id: turnoId, turno_label: turnoLabel, empleado_nombre: cajaForm.empleado, inicio: cajaForm.inicio, cierre: cajaForm.cierre, bajas: cajaForm.bajas, bonos: cajaForm.bonos, saved_at: new Date().toISOString() });
@@ -1567,30 +1570,33 @@ const OwnerDashboard = ({ session, onLogout }) => {
             )}
 
             {settingsTab === "empleados" && (
-              <div style={{ maxWidth: 640 }}>
+              <div style={{ maxWidth: 680 }}>
                 <div style={{ ...S.card, marginBottom: 16 }}>
                   <div style={{ fontSize: 13, color: "#9f67ff", fontWeight: 700, marginBottom: 12 }}>➕ Agregar empleado</div>
-                  <div style={{ background: "#0d0a1a", border: `1px solid ${C.border}`, borderRadius: 11, padding: "12px 14px", marginBottom: 14, fontSize: 12, color: "#475569", lineHeight: 1.8 }}>
-                    <div>📝 <strong style={{ color: "#9f67ff" }}>Paso 1:</strong> Completá nombre, usuario y contraseña.</div>
-                    <div>⏰ <strong style={{ color: "#9f67ff" }}>Paso 2:</strong> Definí el horario general (ej: 08:00 a 19:30).</div>
-                    <div>📅 <strong style={{ color: "#9f67ff" }}>Paso 3:</strong> Activá los días que trabaja.</div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
                     {[{ label: "Nombre", key: "nombre", ph: "Juan Pérez" }, { label: "Usuario", key: "usuario", ph: "juanperez" }, { label: "Contraseña", key: "pass", ph: "••••••", type: "password" }].map(f => (<div key={f.key}><label style={S.label}>{f.label}</label><input type={f.type || "text"} value={newEmpForm[f.key]} placeholder={f.ph} onChange={e => setNewEmpForm({ ...newEmpForm, [f.key]: e.target.value })} style={S.input} /></div>))}
-                    <div>
-                      <label style={S.label}>Horario general</label>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        <input type="time" value={newEmpForm.horario_inicio || ""} onChange={e => setNewEmpForm({ ...newEmpForm, horario_inicio: e.target.value })} style={{ ...S.input, fontSize: 13 }} placeholder="Desde" />
-                        <input type="time" value={newEmpForm.horario_fin || ""} onChange={e => setNewEmpForm({ ...newEmpForm, horario_fin: e.target.value })} style={{ ...S.input, fontSize: 13 }} placeholder="Hasta" />
-                      </div>
-                    </div>
                   </div>
                   <div style={{ marginBottom: 14 }}>
-                    <label style={S.label}>Días que trabaja</label>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <label style={S.label}>Días y horarios</label>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {DIAS.map(d => {
                         const on = (newEmpForm.dias || []).includes(d.id);
-                        return (<button key={d.id} onClick={() => { const dias = newEmpForm.dias || []; setNewEmpForm({ ...newEmpForm, dias: dias.includes(d.id) ? dias.filter(x => x !== d.id) : [...dias, d.id] }); }} style={{ width: 52, padding: "7px 0", border: `1px solid ${on ? "#7c3aed" : C.border}`, borderRadius: 8, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#475569", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400, textAlign: "center" }}>{d.label}</button>);
+                        const horIni = (newEmpForm.horarios_dia || {})[d.id + "_ini"] || "";
+                        const horFin = (newEmpForm.horarios_dia || {})[d.id + "_fin"] || "";
+                        return (
+                          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <button onClick={() => { const dias = newEmpForm.dias || []; setNewEmpForm({ ...newEmpForm, dias: dias.includes(d.id) ? dias.filter(x => x !== d.id) : [...dias, d.id] }); }} style={{ width: 52, padding: "7px 0", border: `1px solid ${on ? "#7c3aed" : C.border}`, borderRadius: 8, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#475569", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
+                            {on ? (
+                              <div style={{ display: "flex", gap: 8, flex: 1, alignItems: "center" }}>
+                                <input type="time" value={horIni} placeholder="Desde" onChange={e => setNewEmpForm({ ...newEmpForm, horarios_dia: { ...(newEmpForm.horarios_dia || {}), [d.id + "_ini"]: e.target.value } })} style={{ ...S.input, fontSize: 12, flex: 1 }} />
+                                <span style={{ color: "#475569", fontSize: 12 }}>–</span>
+                                <input type="time" value={horFin} placeholder="Hasta" onChange={e => setNewEmpForm({ ...newEmpForm, horarios_dia: { ...(newEmpForm.horarios_dia || {}), [d.id + "_fin"]: e.target.value } })} style={{ ...S.input, fontSize: 12, flex: 1 }} />
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Franco</span>
+                            )}
+                          </div>
+                        );
                       })}
                     </div>
                   </div>
@@ -1602,20 +1608,39 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: emp.activo ? "#4ade80" : "#4a4a5a" }} /><span style={{ color: emp.activo ? "#f1f5f9" : "#475569", fontSize: 14, fontWeight: 600 }}>{emp.nombre}</span></div>
-                          <div style={{ fontSize: 11, color: "#475569", marginTop: 3, marginLeft: 16 }}>👤 {emp.usuario}{emp.horario_inicio ? ` · ⏰ ${emp.horario_inicio}${emp.horario_fin ? " – " + emp.horario_fin : ""}` : ""}</div>
+                          <div style={{ fontSize: 11, color: "#475569", marginTop: 3, marginLeft: 16 }}>👤 {emp.usuario} · {(emp.dias || []).length} días activos</div>
                         </div>
                         <div style={{ display: "flex", gap: 8 }}><button onClick={() => toggleEmp(emp.id, emp.activo)} style={S.ghost}>{emp.activo ? "Desactivar" : "Activar"}</button><button onClick={() => delEmp(emp.id)} style={S.danger}>🗑️</button></div>
                       </div>
-                      <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, fontWeight: 600 }}>Horario general</div>
-                      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                        <div style={{ flex: 1 }}><label style={S.label}>Desde</label><input type="time" value={emp.horario_inicio || ""} onChange={e => { db.updateEmpleado(emp.id, { horario_inicio: e.target.value }); setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, horario_inicio: e.target.value } : x)); }} style={{ ...S.input, fontSize: 13 }} /></div>
-                        <div style={{ flex: 1 }}><label style={S.label}>Hasta</label><input type="time" value={emp.horario_fin || ""} onChange={e => { db.updateEmpleado(emp.id, { horario_fin: e.target.value }); setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, horario_fin: e.target.value } : x)); }} style={{ ...S.input, fontSize: 13 }} /></div>
-                      </div>
-                      <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, fontWeight: 600 }}>Días que trabaja</div>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, fontWeight: 600 }}>Días y horarios</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {DIAS.map(d => {
                           const on = (emp.dias || []).includes(d.id);
-                          return (<button key={d.id} onClick={() => updateEmpDia(emp.id, d.id)} style={{ width: 50, padding: "6px 0", border: `1px solid ${on ? "#7c3aed" : "#1a1530"}`, borderRadius: 7, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#4c3a70", cursor: "pointer", fontSize: 12, fontWeight: on ? 700 : 400, textAlign: "center" }}>{d.label}</button>);
+                          const horarios_dia = emp.horarios_dia || {};
+                          const horIni = horarios_dia[d.id + "_ini"] || emp.horario_inicio || "";
+                          const horFin = horarios_dia[d.id + "_fin"] || emp.horario_fin || "";
+                          return (
+                            <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <button onClick={() => updateEmpDia(emp.id, d.id)} style={{ width: 52, padding: "6px 0", border: `1px solid ${on ? "#7c3aed" : "#1a1530"}`, borderRadius: 7, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#4c3a70", cursor: "pointer", fontSize: 12, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
+                              {on ? (
+                                <div style={{ display: "flex", gap: 8, flex: 1, alignItems: "center" }}>
+                                  <input type="time" value={horIni} placeholder="Desde" onChange={e => {
+                                    const newHD = { ...(emp.horarios_dia || {}), [d.id + "_ini"]: e.target.value };
+                                    db.updateEmpleado(emp.id, { horarios_dia: newHD });
+                                    setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, horarios_dia: newHD } : x));
+                                  }} style={{ ...S.input, fontSize: 12, flex: 1 }} />
+                                  <span style={{ color: "#475569", fontSize: 12 }}>–</span>
+                                  <input type="time" value={horFin} placeholder="Hasta" onChange={e => {
+                                    const newHD = { ...(emp.horarios_dia || {}), [d.id + "_fin"]: e.target.value };
+                                    db.updateEmpleado(emp.id, { horarios_dia: newHD });
+                                    setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, horarios_dia: newHD } : x));
+                                  }} style={{ ...S.input, fontSize: 12, flex: 1 }} />
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Franco</span>
+                              )}
+                            </div>
+                          );
                         })}
                       </div>
                     </div>))}
