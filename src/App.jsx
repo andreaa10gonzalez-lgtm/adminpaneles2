@@ -536,6 +536,9 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [empHistoryId, setEmpHistoryId] = useState(null);
   const [jugSeg, setJugSeg] = useState(null);
   const [jugFiltro, setJugFiltro] = useState("");
+  const [iaLoading, setIaLoading] = useState(false);
+  const [iaAnalisis, setIaAnalisis] = useState(null);
+  const [iaPregunta, setIaPregunta] = useState("");
   const fileRef = useRef();
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2800); };
 
@@ -721,7 +724,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
     { id: "bonos", label: "🎁 Bonos" }, { id: "bajas", label: "📤 Bajas" },
     { id: "importar", label: "📂 Importar" }, { id: "cargar", label: editId ? "✏️ Editar" : "➕ Panel" },
     { id: "historial", label: "📋 Historial" }, { id: "campana", label: "📣 Campaña" },
-    { id: "meses", label: "📆 Meses" }, { id: "empleados_hist", label: "👤 Empleados" }, { id: "ajustes", label: "⚙️ Ajustes" },
+    { id: "meses", label: "📆 Meses" }, { id: "ia", label: "🤖 IA Analista" }, { id: "empleados_hist", label: "👤 Empleados" }, { id: "ajustes", label: "⚙️ Ajustes" },
   ];
 
   const CajaBajas = ({ formState, setFormState }) => {
@@ -1282,6 +1285,143 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {activeTab === "ia" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+              <div style={{ width: 46, height: 46, borderRadius: 14, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🤖</div>
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: "#9f67ff" }}>IA Analista</h2>
+                <p style={{ color: "#475569", fontSize: 12, margin: "3px 0 0" }}>Análisis inteligente de tu operación en tiempo real</p>
+              </div>
+            </div>
+
+            <div style={{ ...S.card, marginBottom: 16, background: "linear-gradient(135deg,rgba(124,58,237,0.08),rgba(79,70,229,0.05))", borderColor: "rgba(124,58,237,0.3)" }}>
+              <div style={{ fontSize: 12, color: "#9f67ff", fontWeight: 700, marginBottom: 10 }}>📊 Datos que va a analizar</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+                {[
+                  { label: "Cargas del mes", v: fmt(cmN + cmR) },
+                  { label: "Neto del mes", v: fmt(cmN) },
+                  { label: "Jugadores activos", v: cmUnicos },
+                  { label: "Alertas de caja", v: alertas.length },
+                ].map(x => (
+                  <div key={x.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{x.label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{x.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ ...S.card, marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: "#475569", fontWeight: 600, marginBottom: 10 }}>💬 Preguntale algo específico (opcional)</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <input
+                  type="text"
+                  value={iaPregunta}
+                  onChange={e => setIaPregunta(e.target.value)}
+                  placeholder='Ej: "¿Qué días rinden más?" o "¿Hay algo raro en caja?"'
+                  style={{ ...S.input, flex: 1, fontSize: 13 }}
+                  onKeyDown={e => e.key === "Enter" && !iaLoading && (() => {
+                    setIaLoading(true);
+                    setIaAnalisis(null);
+                    const mesesData = {};
+                    entries.forEach(e => {
+                      const mes = e.fecha.slice(0,7);
+                      if (!mesesData[mes]) mesesData[mes] = { cargas: 0, retiros: 0, dias: 0 };
+                      mesesData[mes].cargas += e.cargas || 0;
+                      mesesData[mes].retiros += e.retiros || 0;
+                      mesesData[mes].dias++;
+                    });
+                    const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
+                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDAT OS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
+                    fetch("https://api.anthropic.com/v1/messages", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 1000,
+                        messages: [{ role: "user", content: prompt }]
+                      })
+                    }).then(r => r.json()).then(data => {
+                      setIaAnalisis(data.content?.[0]?.text || "No se pudo obtener análisis.");
+                      setIaLoading(false);
+                    }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
+                  })()}
+                />
+                <button
+                  onClick={() => {
+                    if (iaLoading) return;
+                    setIaLoading(true);
+                    setIaAnalisis(null);
+                    const mesesData = {};
+                    entries.forEach(e => {
+                      const mes = e.fecha.slice(0,7);
+                      if (!mesesData[mes]) mesesData[mes] = { cargas: 0, retiros: 0, dias: 0 };
+                      mesesData[mes].cargas += e.cargas || 0;
+                      mesesData[mes].retiros += e.retiros || 0;
+                      mesesData[mes].dias++;
+                    });
+                    const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
+                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDAT OS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
+                    fetch("https://api.anthropic.com/v1/messages", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 1000,
+                        messages: [{ role: "user", content: prompt }]
+                      })
+                    }).then(r => r.json()).then(data => {
+                      setIaAnalisis(data.content?.[0]?.text || "No se pudo obtener análisis.");
+                      setIaLoading(false);
+                    }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
+                  }}
+                  disabled={iaLoading}
+                  style={{ ...S.btn, padding: "11px 22px", opacity: iaLoading ? 0.7 : 1, whiteSpace: "nowrap" }}
+                >
+                  {iaLoading ? "Analizando..." : "🔍 Analizar"}
+                </button>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                {["¿Qué días rinden más?", "¿Hay riesgo en empleados?", "¿Están creciendo los jugadores?", "Recomendaciones para esta semana"].map(q => (
+                  <button key={q} onClick={() => setIaPregunta(q)} style={{ background: "#0a0a16", border: "1px solid #1e1e38", color: "#475569", padding: "5px 12px", borderRadius: 20, cursor: "pointer", fontSize: 11 }}>{q}</button>
+                ))}
+              </div>
+            </div>
+
+            {iaLoading && (
+              <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>🤖</div>
+                <div style={{ color: "#9f67ff", fontWeight: 600, fontSize: 15 }}>Analizando tu operación...</div>
+                <div style={{ color: "#475569", fontSize: 12, marginTop: 6 }}>Procesando datos del panel, caja y empleados</div>
+              </div>
+            )}
+
+            {iaAnalisis && !iaLoading && (
+              <div style={{ ...S.card, borderColor: "rgba(124,58,237,0.3)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🤖</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9f67ff" }}>Análisis de IA</div>
+                  <button onClick={() => setIaAnalisis(null)} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 18 }}>✕</button>
+                </div>
+                <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{iaAnalisis}</div>
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #1e1e38", display: "flex", gap: 10 }}>
+                  <button onClick={() => { setIaAnalisis(null); setIaPregunta(""); }} style={S.ghost}>Nueva consulta</button>
+                  <button onClick={() => navigator.clipboard?.writeText(iaAnalisis)} style={{ ...S.ghost, color: "#475569" }}>📋 Copiar</button>
+                </div>
+              </div>
+            )}
+
+            {!iaAnalisis && !iaLoading && (
+              <div style={{ ...S.card, textAlign: "center", padding: 40, borderStyle: "dashed" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🧠</div>
+                <div style={{ color: "#9f67ff", fontWeight: 600, fontSize: 15, marginBottom: 6 }}>IA lista para analizar</div>
+                <div style={{ color: "#475569", fontSize: 13 }}>Presioná "Analizar" para obtener un diagnóstico de tu operación,<br/>o escribí una pregunta específica.</div>
+              </div>
+            )}
           </div>
         )}
 
