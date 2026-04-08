@@ -12,6 +12,16 @@ const DIAS = [
 ];
 const DIA_MAP = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"];
 
+// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+const C = {
+  bg: "#0d0b1a",
+  card: "#13102a",
+  border: "#2a1f4a",
+  accent: "#9f67ff",
+  text: "#f1f5f9",
+  muted: "#475569",
+};
+
 // ─── UTILS ───────────────────────────────────────────────────────────────────
 const parseMonto = (s) => parseFloat(String(s || "").replace(/\./g, "").replace(",", ".").trim()) || 0;
 const fmt = (v) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(v || 0);
