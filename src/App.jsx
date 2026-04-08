@@ -150,7 +150,16 @@ const db = {
 
   // Cajas
   getCajas: async (tid) => { const { data } = await supabase.from("cajas").select("*").eq("tenant_id", tid); return data || []; },
-  upsertCaja: async (c) => supabase.from("cajas").upsert(c, { onConflict: "tenant_id,fecha,turno_id" }),
+  upsertCaja: async (c) => {
+    const { id, ...data } = c;
+    // Try update first, then insert
+    const { data: existing } = await supabase.from("cajas").select("id").eq("tenant_id", data.tenant_id).eq("fecha", data.fecha).eq("turno_id", data.turno_id).single();
+    if (existing) {
+      return supabase.from("cajas").update(data).eq("id", existing.id);
+    } else {
+      return supabase.from("cajas").insert({ ...data });
+    }
+  },
   updateCajaComment: async (tid, fecha, turno_id, comentario) => supabase.from("cajas").update({ comentario_dueno: comentario }).eq("tenant_id", tid).eq("fecha", fecha).eq("turno_id", turno_id),
 
   // Jugadores
@@ -315,8 +324,7 @@ const EmployeeView = ({ session, onLogout }) => {
 
   const handleSave = async () => {
     const turnoKey = `${form.date}_${session.nombre.replace(/\s+/g, "_")}`;
-    const cajaId = `${tid}_${turnoKey}`;
-    const { error } = await db.upsertCaja({ id: cajaId, tenant_id: tid, fecha: form.date, turno_id: turnoKey, turno_label: form.turnoLabel, empleado_nombre: session.nombre, inicio: form.inicio, cierre: form.cierre, bajas: form.bajas, bonos: form.bonos, saved_at: new Date().toISOString() });
+    const { error } = await db.upsertCaja({ tenant_id: tid, fecha: form.date, turno_id: turnoKey, turno_label: form.turnoLabel, empleado_nombre: session.nombre, inicio: form.inicio, cierre: form.cierre, bajas: form.bajas, bonos: form.bonos, saved_at: new Date().toISOString() });
     if (error) { showToast("❌ Error al guardar"); return; }
     setCajas(await db.getCajas(tid));
     showToast("✅ Turno guardado");
@@ -611,8 +619,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
     const horFin = emp?.horario_fin || "";
     const turnoLabel = horIni ? `${horIni}${horFin ? " – " + horFin : ""}` : "Turno";
     const turnoId = `${cajaForm.date}_${cajaForm.empleado.replace(/\s+/g, "_")}`;
-    const cajaId = `${tid}_${turnoId}`;
-    const { error } = await db.upsertCaja({ id: cajaId, tenant_id: tid, fecha: cajaForm.date, turno_id: turnoId, turno_label: turnoLabel, empleado_nombre: cajaForm.empleado, inicio: cajaForm.inicio, cierre: cajaForm.cierre, bajas: cajaForm.bajas, bonos: cajaForm.bonos, saved_at: new Date().toISOString() });
+    const { error } = await db.upsertCaja({ tenant_id: tid, fecha: cajaForm.date, turno_id: turnoId, turno_label: turnoLabel, empleado_nombre: cajaForm.empleado, inicio: cajaForm.inicio, cierre: cajaForm.cierre, bajas: cajaForm.bajas, bonos: cajaForm.bonos, saved_at: new Date().toISOString() });
     if (error) { showToast("❌ Error al guardar: " + error.message); return; }
     setCajas(await db.getCajas(tid));
     showToast("✅ Caja guardada"); setCajaTab("historial");
