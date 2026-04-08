@@ -693,12 +693,18 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const pmEntries = entries.filter(e => e.fecha?.startsWith(pmk()));
   const cmC = sumK(cmEntries, "cargas"), cmR = sumK(cmEntries, "retiros"), cmN = cmC - cmR;
   const pmC = sumK(pmEntries, "cargas"), pmR = sumK(pmEntries, "retiros"), pmN = pmC - pmR;
+  // Comparacion proporcional: promedio diario del mes anterior × dias cargados del mes actual
+  const cmDias = cmEntries.length;
+  const pmDias = pmEntries.length;
+  const pmCProp = pmDias > 0 && cmDias > 0 ? (pmC / pmDias) * cmDias : pmC;
+  const pmRProp = pmDias > 0 && cmDias > 0 ? (pmR / pmDias) * cmDias : pmR;
+  const pmNProp = pmCProp - pmRProp;
   const cmNuevos = sumK(cmEntries, "jugadores_nuevos"), pmNuevos = sumK(pmEntries, "jugadores_nuevos");
   const cmUnicos = sumK(cmEntries, "jugadores_unicos"), pmUnicos = sumK(pmEntries, "jugadores_unicos");
   const totalPlayers = jugadores.length;
   const recoveryRate = campaign.enviados > 0 ? ((campaign.recuperados / campaign.enviados) * 100).toFixed(1) : 0;
   const chartData = cmEntries.map(e => ({ dia: e.fecha?.slice(8), Cargas: e.cargas, Retiros: e.retiros, Neto: e.cargas - e.retiros }));
-  const compareData = [{ name: "Cargas", Anterior: pmC, Actual: cmC }, { name: "Retiros", Anterior: pmR, Actual: cmR }, { name: "Neto", Anterior: pmN, Actual: cmN }];
+  const compareData = [{ name: "Cargas", Anterior: Math.round(pmCProp), Actual: cmC }, { name: "Retiros", Anterior: Math.round(pmRProp), Actual: cmR }, { name: "Neto", Anterior: Math.round(pmNProp), Actual: cmN }];
   const last7 = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const ds = d.toISOString().slice(0, 10); const e = entries.find(x => x.fecha === ds); return { dia: d.toLocaleDateString("es-AR", { weekday: "short" }), Cargas: e?.cargas || 0, Retiros: e?.retiros || 0 }; }).reverse();
 
   const cajaHistorial = cajas.map(c => {
@@ -827,10 +833,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "resumen" && (
           <div>
+            {cmDias > 0 && pmDias > 0 && (
+              <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 12, fontSize: 12, color: "#9f67ff" }}>
+                📊 Comparando <strong>{cmDias} días</strong> de este mes vs el equivalente proporcional del mes anterior ({pmDias} días totales)
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 14 }}>
-              <StatCard icon="💰" label="Cargas del Mes" value={fmt(cmC)} trend={pct(cmC, pmC)} color="#4ade80" />
-              <StatCard icon="💸" label="Retiros del Mes" value={fmt(cmR)} trend={pct(cmR, pmR)} color="#f87171" />
-              <StatCard icon="📊" label="Neto del Mes" value={fmt(cmN)} trend={pct(cmN, pmN)} color={cmN >= 0 ? "#4ade80" : "#f87171"} />
+              <StatCard icon="💰" label="Cargas del Mes" value={fmt(cmC)} trend={pct(cmC, pmCProp)} color="#4ade80" />
+              <StatCard icon="💸" label="Retiros del Mes" value={fmt(cmR)} trend={pct(cmR, pmRProp)} color="#f87171" />
+              <StatCard icon="📊" label="Neto del Mes" value={fmt(cmN)} trend={pct(cmN, pmNProp)} color={cmN >= 0 ? "#4ade80" : "#f87171"} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
               <StatCard icon="🆕" label="Jugadores Nuevos" value={cmNuevos} trend={pct(cmNuevos, pmNuevos)} color="#fbbf24" />
@@ -1182,31 +1193,76 @@ const OwnerDashboard = ({ session, onLogout }) => {
         {activeTab === "historial" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#c084fc" }}>📋 Historial</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: "#9f67ff" }}>📋 Historial</h2>
               <button onClick={() => { const rows = [["Fecha", "Cargas", "Retiros", "Neto"], ...[...entries].reverse().map(e => [e.fecha, e.cargas, e.retiros, e.cargas - e.retiros])]; const csv = rows.map(r => r.join(",")).join("\n"); const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `historial.csv`; a.click(); }} style={S.ghost}>⬇️ Exportar CSV</button>
             </div>
-            {entries.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#7c6fa0" }}>No hay registros.</div> : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[...entries].reverse().map(entry => {
-                  const neto = entry.cargas - entry.retiros;
-                  return (<div key={entry.id} style={{ background: "#13102a", border: "1px solid #2a1f4a", borderRadius: 14, padding: "12px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                    <div style={{ minWidth: 110 }}>
-                      <div style={{ fontWeight: 700, color: "#a78bfa", fontSize: 13 }}>{new Date(entry.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
-                      {entry.notas && <div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 2 }}>{entry.notas}</div>}
-                      {entry.jugadores_nuevos > 0 && <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 2 }}>🆕 {entry.jugadores_nuevos} nuevos</div>}
-                      {(entry.edit_log || []).length > 0 && <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 2 }}>✏️ editado {entry.edit_log.length} vez{entry.edit_log.length > 1 ? "es" : ""}</div>}
-                    </div>
-                    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                      {[{ label: "Cargas", v: entry.cargas, c: "#4ade80" }, { label: "Retiros", v: entry.retiros, c: "#f87171" }, { label: "Neto", v: neto, c: neto >= 0 ? "#4ade80" : "#f87171" }].map(x => (<div key={x.label} style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#7c6fa0" }}>{x.label}</div><div style={{ color: x.c, fontWeight: 700 }}>{fmt(x.v)}</div></div>))}
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => editEntry(entry)} style={{ background: "#1e1b3a", border: "1px solid #4c1d95", color: "#a78bfa", padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>✏️</button>
-                        <button onClick={() => delEntry(entry.id)} style={{ background: "#1e0a0a", border: "1px solid #7f1d1d", color: "#f87171", padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>🗑️</button>
+            {entries.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#475569" }}>No hay registros.</div> : (() => {
+              const byMes = {};
+              [...entries].reverse().forEach(e => {
+                const mes = e.fecha.slice(0, 7);
+                if (!byMes[mes]) byMes[mes] = { entries: [], cargas: 0, retiros: 0, jugNuevos: 0 };
+                byMes[mes].entries.push(e);
+                byMes[mes].cargas += e.cargas || 0;
+                byMes[mes].retiros += e.retiros || 0;
+                byMes[mes].jugNuevos += e.jugadores_nuevos || 0;
+              });
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {Object.entries(byMes).map(([mes, data]) => {
+                    const neto = data.cargas - data.retiros;
+                    const mesLabel = new Date(mes + "-15").toLocaleString("es-AR", { month: "long", year: "numeric" });
+                    const isOpen = expandedCaja === mes;
+                    return (
+                      <div key={mes} style={{ ...S.card }}>
+                        <div onClick={() => setExpandedCaja(isOpen ? null : mes)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", flexWrap: "wrap", gap: 10 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9", textTransform: "capitalize" }}>📅 {mesLabel}</div>
+                            <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{data.entries.length} días · {data.jugNuevos} jugadores nuevos</div>
+                          </div>
+                          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                            {[{ label: "Cargas", v: data.cargas, c: "#4ade80" }, { label: "Retiros", v: data.retiros, c: "#f87171" }, { label: "Neto", v: neto, c: neto >= 0 ? "#4ade80" : "#f87171" }].map(x => (
+                              <div key={x.label} style={{ textAlign: "right" }}>
+                                <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
+                                <div style={{ color: x.c, fontWeight: 700, fontSize: 14 }}>{fmt(x.v)}</div>
+                              </div>
+                            ))}
+                            <span style={{ color: "#475569", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span>
+                          </div>
+                        </div>
+                        {isOpen && (
+                          <div style={{ marginTop: 14, borderTop: "1px solid #1e1e38", paddingTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+                            {data.entries.map(entry => {
+                              const neto = entry.cargas - entry.retiros;
+                              return (
+                                <div key={entry.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 11, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: "#a78bfa", fontSize: 13 }}>{new Date(entry.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
+                                    {entry.notas && <div style={{ fontSize: 11, color: "#475569", marginTop: 1 }}>{entry.notas}</div>}
+                                    {entry.jugadores_nuevos > 0 && <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 1 }}>🆕 {entry.jugadores_nuevos} nuevos</div>}
+                                  </div>
+                                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                                    {[{ label: "Cargas", v: entry.cargas, c: "#4ade80" }, { label: "Retiros", v: entry.retiros, c: "#f87171" }, { label: "Neto", v: neto, c: neto >= 0 ? "#4ade80" : "#f87171" }].map(x => (
+                                      <div key={x.label} style={{ textAlign: "right" }}>
+                                        <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
+                                        <div style={{ color: x.c, fontWeight: 600, fontSize: 13 }}>{fmt(x.v)}</div>
+                                      </div>
+                                    ))}
+                                    <div style={{ display: "flex", gap: 5 }}>
+                                      <button onClick={e => { e.stopPropagation(); editEntry(entry); }} style={{ background: "#0e0e1a", border: "1px solid #2a1f4a", color: "#a78bfa", padding: "4px 8px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>✏️</button>
+                                      <button onClick={e => { e.stopPropagation(); delEntry(entry.id); }} style={{ background: "#1e0a0a", border: "1px solid #7f1d1d", color: "#f87171", padding: "4px 8px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>🗑️</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>);
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1347,13 +1403,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       mesesData[mes].dias++;
                     });
                     const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
-                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDAT OS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
+                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDATOS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
                     fetch("https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/ia-analista", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ prompt })
                     }).then(r => r.json()).then(data => {
-                      setIaAnalisis(data.result || data.error || "No se pudo obtener análisis.");
+                      setIaAnalisis(data.result || ("Error: " + (data.error || "No se pudo obtener análisis.")));
                       setIaLoading(false);
                     }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
                   })()}
@@ -1372,13 +1428,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       mesesData[mes].dias++;
                     });
                     const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
-                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDAT OS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
+                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDATOS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
                     fetch("https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/ia-analista", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ prompt })
                     }).then(r => r.json()).then(data => {
-                      setIaAnalisis(data.result || data.error || "No se pudo obtener análisis.");
+                      setIaAnalisis(data.result || ("Error: " + (data.error || "No se pudo obtener análisis.")));
                       setIaLoading(false);
                     }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
                   }}
@@ -1604,9 +1660,25 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [session, setSession] = useState(null);
-  if (!session) return <Login onLogin={setSession} />;
-  if (session.role === "superadmin") return <SuperAdmin onLogout={() => setSession(null)} />;
-  if (session.role === "employee") return <EmployeeView session={session} onLogout={() => setSession(null)} />;
-  return <OwnerDashboard session={session} onLogout={() => setSession(null)} />;
+  const [session, setSession] = useState(() => {
+    try {
+      const saved = localStorage.getItem("casino_session");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const handleLogin = (s) => {
+    try { localStorage.setItem("casino_session", JSON.stringify(s)); } catch {}
+    setSession(s);
+  };
+
+  const handleLogout = () => {
+    try { localStorage.removeItem("casino_session"); } catch {}
+    setSession(null);
+  };
+
+  if (!session) return <Login onLogin={handleLogin} />;
+  if (session.role === "superadmin") return <SuperAdmin onLogout={handleLogout} />;
+  if (session.role === "employee") return <EmployeeView session={session} onLogout={handleLogout} />;
+  return <OwnerDashboard session={session} onLogout={handleLogout} />;
 }
