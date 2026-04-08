@@ -314,8 +314,10 @@ const EmployeeView = ({ session, onLogout }) => {
   const hasAlert = dif !== null && Math.abs(dif) > 100;
 
   const handleSave = async () => {
-    const turnoKey = `${form.date}_${session.nombre}`;
-    await db.upsertCaja({ tenant_id: tid, fecha: form.date, turno_id: turnoKey, turno_label: form.turnoLabel, empleado_nombre: session.nombre, inicio: form.inicio, cierre: form.cierre, bajas: form.bajas, bonos: form.bonos, saved_at: new Date().toISOString() });
+    const turnoKey = `${form.date}_${session.nombre.replace(/\s+/g, "_")}`;
+    const cajaId = `${tid}_${turnoKey}`;
+    const { error } = await db.upsertCaja({ id: cajaId, tenant_id: tid, fecha: form.date, turno_id: turnoKey, turno_label: form.turnoLabel, empleado_nombre: session.nombre, inicio: form.inicio, cierre: form.cierre, bajas: form.bajas, bonos: form.bonos, saved_at: new Date().toISOString() });
+    if (error) { showToast("❌ Error al guardar"); return; }
     setCajas(await db.getCajas(tid));
     showToast("✅ Turno guardado");
   };
@@ -608,8 +610,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
     const horIni = emp?.horario_inicio || "";
     const horFin = emp?.horario_fin || "";
     const turnoLabel = horIni ? `${horIni}${horFin ? " – " + horFin : ""}` : "Turno";
-    const turnoId = `${cajaForm.date}_${cajaForm.empleado}`;
-    await db.upsertCaja({ tenant_id: tid, fecha: cajaForm.date, turno_id: turnoId, turno_label: turnoLabel, empleado_nombre: cajaForm.empleado, inicio: cajaForm.inicio, cierre: cajaForm.cierre, bajas: cajaForm.bajas, bonos: cajaForm.bonos, saved_at: new Date().toISOString() });
+    const turnoId = `${cajaForm.date}_${cajaForm.empleado.replace(/\s+/g, "_")}`;
+    const cajaId = `${tid}_${turnoId}`;
+    const { error } = await db.upsertCaja({ id: cajaId, tenant_id: tid, fecha: cajaForm.date, turno_id: turnoId, turno_label: turnoLabel, empleado_nombre: cajaForm.empleado, inicio: cajaForm.inicio, cierre: cajaForm.cierre, bajas: cajaForm.bajas, bonos: cajaForm.bonos, saved_at: new Date().toISOString() });
+    if (error) { showToast("❌ Error al guardar: " + error.message); return; }
     setCajas(await db.getCajas(tid));
     showToast("✅ Caja guardada"); setCajaTab("historial");
   };
