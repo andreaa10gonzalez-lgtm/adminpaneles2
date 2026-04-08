@@ -1348,16 +1348,12 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     });
                     const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
                     const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDAT OS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
-                    fetch("https://api.anthropic.com/v1/messages", {
+                    fetch("https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/ia-analista", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        model: "claude-sonnet-4-20250514",
-                        max_tokens: 1000,
-                        messages: [{ role: "user", content: prompt }]
-                      })
+                      body: JSON.stringify({ prompt })
                     }).then(r => r.json()).then(data => {
-                      setIaAnalisis(data.content?.[0]?.text || "No se pudo obtener análisis.");
+                      setIaAnalisis(data.result || data.error || "No se pudo obtener análisis.");
                       setIaLoading(false);
                     }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
                   })()}
@@ -1377,16 +1373,12 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     });
                     const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
                     const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDAT OS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
-                    fetch("https://api.anthropic.com/v1/messages", {
+                    fetch("https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/ia-analista", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        model: "claude-sonnet-4-20250514",
-                        max_tokens: 1000,
-                        messages: [{ role: "user", content: prompt }]
-                      })
+                      body: JSON.stringify({ prompt })
                     }).then(r => r.json()).then(data => {
-                      setIaAnalisis(data.content?.[0]?.text || "No se pudo obtener análisis.");
+                      setIaAnalisis(data.result || data.error || "No se pudo obtener análisis.");
                       setIaLoading(false);
                     }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
                   }}
