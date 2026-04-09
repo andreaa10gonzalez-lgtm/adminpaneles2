@@ -190,7 +190,7 @@ const Login = ({ onLogin }) => {
       for (const t of tenants) {
         const emps = await db.getEmpleados(t.id);
         const emp = emps.find(e => e.usuario === user.trim() && e.pass === pass.trim() && e.activo);
-        if (emp) { onLogin({ role: "employee", tenantId: t.id, nombre: emp.nombre, horario_inicio: emp.horario_inicio || "", horario_fin: emp.horario_fin || "", dias: emp.dias || [], horarios: emp.horarios || {} }); return; }
+        if (emp) { onLogin({ role: "employee", tenantId: t.id, nombre: emp.nombre, horario_inicio: emp.horario_inicio || "", horario_fin: emp.horario_fin || "", dias: emp.dias || [], horarios: emp.horarios || {}, horarios_dia: emp.horarios_dia || {}, billeteras: emp.billeteras || [] }); return; }
       }
       setErr("Usuario o contraseña incorrectos");
     } catch (_) { setErr("Error de conexión. Intentá de nuevo."); }
@@ -314,7 +314,8 @@ const EmployeeView = ({ session, onLogout }) => {
     setForm(f => ({ ...f, inicio: prev?.cierre ? { ...prev.cierre } : {} }));
   }, [form.date, cajas]);
 
-  const bills = config?.billeteras || [];
+  const allBills = config?.billeteras || [];
+  const bills = (session.billeteras || []).length > 0 ? allBills.filter(b => (session.billeteras || []).includes(b.id)) : allBills;
   const destinos = config?.destinos_bajas || [];
   const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(form, bills);
   const de = entries.find(e => e.fecha === form.date);
