@@ -169,6 +169,12 @@ const db = {
   // Campaña
   getCampana: async (tid) => { const { data } = await supabase.from("campana").select("*").eq("tenant_id", tid).single(); return data || { enviados: 0, recuperados: 0, depositos: 0 }; },
   upsertCampana: async (tid, c) => supabase.from("campana").upsert({ tenant_id: tid, ...c }),
+
+  // Notificaciones
+  getNotificaciones: async (tid) => { const { data } = await supabase.from("notificaciones").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(50); return data || []; },
+  addNotificacion: async (tid, tipo, mensaje, empleado, datos = {}) => supabase.from("notificaciones").insert({ tenant_id: tid, tipo, mensaje, empleado, datos }),
+  marcarLeida: async (id) => supabase.from("notificaciones").update({ leida: true }).eq("id", id),
+  marcarTodasLeidas: async (tid) => supabase.from("notificaciones").update({ leida: true }).eq("tenant_id", tid),
 };
 
 // ─── LOGIN ───────────────────────────────────────────────────────────────────
@@ -294,6 +300,7 @@ const EmployeeView = ({ session, onLogout }) => {
   const [cajas, setCajas] = useState([]);
   const [entries, setEntries] = useState([]);
   const [tab, setTab] = useState("cargar");
+  const [editApertura, setEditApertura] = useState(false);
   const horarioLabel = getHorarioLabel(session);
   const [form, setForm] = useState({ date: todayStr(), turnoLabel: horarioLabel || "Mi turno", inicio: {}, cierre: {}, bajas: [], bonos: [] });
   const [toast, setToast] = useState("");
@@ -301,17 +308,46 @@ const EmployeeView = ({ session, onLogout }) => {
   const diaHoy = DIA_MAP[new Date().getDay()];
   const trabajaHoy = !session.dias?.length || session.dias.includes(diaHoy);
 
+  // Funcion para obtener el ultimo cierre de cualquier empleado antes de una fecha
+  const getLastCierre = (cajs, beforeDate) => {
+    // Busca el cierre mas reciente de cualquier empleado antes de la fecha dada
+    return (cajs || [])
+      .filter(c => c.fecha < beforeDate && c.cierre && Object.keys(c.cierre).length > 0)
+      .sort((a, b) => {
+        // Ordenar por fecha desc, luego por saved_at desc
+        const fechaDiff = b.fecha.localeCompare(a.fecha);
+        if (fechaDiff !== 0) return fechaDiff;
+        return (b.saved_at || "").localeCompare(a.saved_at || "");
+      })[0];
+  };
+
   useEffect(() => {
-    db.getConfig(tid).then(d => setConfig(d || { billeteras: [], destinos_bajas: [] }));
-    db.getCajas(tid).then(setCajas);
-    db.getEntries(tid).then(setEntries);
+    Promise.all([
+      db.getConfig(tid),
+      db.getCajas(tid),
+      db.getEntries(tid),
+    ]).then(([cfg, cajs, ents]) => {
+      setConfig(cfg || { billeteras: [], destinos_bajas: [] });
+      setEntries(ents);
+      setCajas(cajs);
+      // Auto-fill apertura con el ultimo cierre registrado (cualquier empleado)
+      const hoy = todayStr();
+      const prev = getLastCierre(cajs, hoy + "Z"); // incluye hoy
+      if (prev?.cierre) {
+        setForm(f => ({ ...f, inicio: { ...prev.cierre } }));
+      }
+    });
   }, []);
 
-  // Auto-fill apertura from last cierre of same employee
+  // Re-fill apertura si cambia la fecha
   useEffect(() => {
-    const prev = cajas.filter(c => c.empleado_nombre === session.nombre && c.fecha < form.date)
-      .sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
-    setForm(f => ({ ...f, inicio: prev?.cierre ? { ...prev.cierre } : {} }));
+    if (cajas.length === 0) return;
+    const prev = getLastCierre(cajas, form.date + "Z");
+    if (prev?.cierre) {
+      setForm(f => ({ ...f, inicio: { ...prev.cierre } }));
+    } else {
+      setForm(f => ({ ...f, inicio: {} }));
+    }
   }, [form.date, cajas]);
 
   const allBills = config?.billeteras || [];
@@ -327,6 +363,14 @@ const EmployeeView = ({ session, onLogout }) => {
     const turnoKey = `${form.date}_${session.nombre.replace(/\s+/g, "_")}`;
     const { error } = await db.upsertCaja({ tenant_id: tid, fecha: form.date, turno_id: turnoKey, turno_label: form.turnoLabel, empleado_nombre: session.nombre, inicio: form.inicio, cierre: form.cierre, bajas: form.bajas, bonos: form.bonos, saved_at: new Date().toISOString() });
     if (error) { showToast("❌ Error al guardar"); return; }
+    if (editApertura) {
+      await db.addNotificacion(tid, "correccion_apertura",
+        `${session.nombre} corrigió la apertura del ${form.date}`,
+        session.nombre,
+        { fecha: form.date, turno_label: form.turnoLabel, inicio: form.inicio }
+      );
+      setEditApertura(false);
+    }
     setCajas(await db.getCajas(tid));
     showToast("✅ Turno guardado");
   };
@@ -471,11 +515,19 @@ const EmployeeView = ({ session, onLogout }) => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                   {[{ label: "🌅 Apertura", key: "inicio", color: "#38bdf8", ro: true }, { label: "🌆 Cierre", key: "cierre", color: "#f87171", ro: false }].map(col => {
                     const total = bills.reduce((s, b) => s + (+(form[col.key][b.id] || 0)), 0);
+                    const editingApertura = editApertura && col.key === "inicio";
                     return (
                       <div key={col.key} style={S.card}>
-                        <div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                          <div style={{ fontSize: 12, color: col.color, fontWeight: 700 }}>{col.label}</div>
+                          {col.key === "inicio" && (
+                            <button onClick={() => setEditApertura(!editApertura)} style={{ background: editApertura ? "#2d1b69" : "transparent", border: `1px solid ${editApertura ? "#7c3aed" : "#2a1f4a"}`, color: editApertura ? "#c084fc" : "#475569", padding: "3px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>
+                              {editApertura ? "✓ Listo" : "✏️ Corregir"}
+                            </button>
+                          )}
+                        </div>
                         {bills.map(b => {
-                          const isAuto = col.ro && !!form.inicio[b.id];
+                          const isAuto = col.ro && !!form.inicio[b.id] && !editingApertura;
                           return (
                             <div key={b.id} style={{ marginBottom: 10 }}>
                               <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
@@ -488,6 +540,11 @@ const EmployeeView = ({ session, onLogout }) => {
                         <div style={{ borderTop: "1px solid #1e1e38", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                           <span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span>
                         </div>
+                        {editingApertura && (
+                          <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(124,58,237,0.08)", borderRadius: 9, fontSize: 12, color: "#a78bfa" }}>
+                            ⚠️ Al guardar, se notificará al dueño la corrección de apertura.
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -550,25 +607,33 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [iaLoading, setIaLoading] = useState(false);
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaPregunta, setIaPregunta] = useState("");
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
   const fileRef = useRef();
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2800); };
 
   const loadAll = async () => {
-    const [cfg, ents, jugs, camp, emps, cajs] = await Promise.all([
+    const [cfg, ents, jugs, camp, emps, cajs, notifs] = await Promise.all([
       db.getConfig(tid), db.getEntries(tid), db.getJugadores(tid),
       db.getCampana(tid), db.getEmpleados(tid), db.getCajas(tid),
+      db.getNotificaciones(tid),
     ]);
     setConfig(cfg || { nombre: session.nombre, billeteras: [], destinos_bajas: [] });
     setEntries(ents); setJugadores(jugs); setCampaign(camp); setEmpleados(emps); setCajas(cajs);
+    setNotificaciones(notifs || []);
   };
 
   useEffect(() => { loadAll(); }, []);
 
-  // Auto-fill apertura caja con cierre anterior del mismo empleado
+  // Auto-fill apertura caja con el ultimo cierre registrado (cualquier empleado)
   useEffect(() => {
     if (!cajaForm.empleado) return;
-    const prev = cajas.filter(c => c.empleado_nombre === cajaForm.empleado && c.fecha < cajaForm.date)
-      .sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+    const prev = cajas
+      .filter(c => c.fecha < cajaForm.date && c.cierre && Object.keys(c.cierre).length > 0)
+      .sort((a, b) => {
+        const fd = b.fecha.localeCompare(a.fecha);
+        return fd !== 0 ? fd : (b.saved_at || "").localeCompare(a.saved_at || "");
+      })[0];
     setCajaForm(f => ({ ...f, inicio: prev?.cierre ? { ...prev.cierre } : {} }));
   }, [cajaForm.date, cajaForm.empleado, cajas]);
 
@@ -707,18 +772,36 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const cmUnicos = sumK(cmEntries, "jugadores_unicos"), pmUnicos = sumK(pmEntries, "jugadores_unicos");
   const totalPlayers = jugadores.length;
 
-  // Segmentacion de jugadores: calculo desde entries del mes actual
-  // Estimamos carga promedio por jugador unico activo en el mes
-  const cmTotalCargas = cmC;
-  const cmTotalUnicos = Math.max(cmUnicos, 1);
-  const avgCargaPerJug = cmTotalCargas / cmTotalUnicos;
-  // Para cada jugador calculamos su frecuencia y estimacion de carga basada en su aparicion
+  // Segmentacion de jugadores: distribuimos cargas del mes entre jugadores
+  // Usamos primera_vez para determinar cuando aparecio cada jugador
+  // y calculamos actividad proporcional basada en los dias con datos
   const jugStatsMap = {};
+  // Primero identificamos todos los jugadores activos en el mes actual
+  // Un jugador es "activo" si aparece en jugadores_nuevos_lista en alguna entry del mes
+  // O si ya estaba antes y el mes tiene entradas
+  const jugadoresActivos = new Set();
   cmEntries.forEach(e => {
-    (e.jugadores_nuevos_lista || []).forEach(nombre => {
+    (e.jugadores_nuevos_lista || []).forEach(n => jugadoresActivos.add(n));
+  });
+  // Para jugadores que ya existian antes del mes actual, los agregamos a activos
+  const primerDiaMes = cmk() + "-01";
+  jugadores.forEach(j => {
+    if (j.primera_vez && j.primera_vez < primerDiaMes) jugadoresActivos.add(j.nombre);
+  });
+  const totalActivos = Math.max(jugadoresActivos.size, 1);
+  // Distribuimos las cargas de cada dia entre los activos
+  cmEntries.forEach(e => {
+    const activosEseDia = e.jugadoresUnicos || Math.round(totalActivos * 0.6);
+    const cargaPerJug = activosEseDia > 0 ? (e.cargas / activosEseDia) : 0;
+    jugadoresActivos.forEach(nombre => {
       if (!jugStatsMap[nombre]) jugStatsMap[nombre] = { cargas: 0, dias: 0 };
-      jugStatsMap[nombre].dias += 1;
-      jugStatsMap[nombre].cargas += e.jugadoresUnicos > 0 ? (e.cargas / e.jugadoresUnicos) : 0;
+      // Solo contamos dias donde el jugador probablemente estuvo activo
+      // Usamos una probabilidad basada en la frecuencia del dia
+      const prob = activosEseDia / totalActivos;
+      if (prob > 0.3) { // si mas del 30% de jugadores estuvieron ese dia
+        jugStatsMap[nombre].cargas += cargaPerJug;
+        jugStatsMap[nombre].dias += 1;
+      }
     });
   });
   const getJugStats = (nombre) => jugStatsMap[nombre] || { cargas: 0, dias: 0 };
@@ -841,6 +924,32 @@ const OwnerDashboard = ({ session, onLogout }) => {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ fontSize: 11, color: "#9f67ff", fontWeight: 600, textTransform: "capitalize" }}>{monthLabel()}</div>
+            <div style={{ position: "relative" }}>
+              <button onClick={() => { setShowNotif(!showNotif); if (!showNotif) db.marcarTodasLeidas(tid).then(() => setNotificaciones(n => n.map(x => ({ ...x, leida: true })))); }} style={{ position: "relative", background: "transparent", border: "1px solid #1e1e38", color: "#475569", padding: "7px 11px", borderRadius: 9, cursor: "pointer", fontSize: 15 }}>
+                🔔
+                {notificaciones.filter(n => !n.leida).length > 0 && (
+                  <span style={{ position: "absolute", top: -4, right: -4, background: "#f87171", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{notificaciones.filter(n => !n.leida).length}</span>
+                )}
+              </button>
+              {showNotif && (
+                <div style={{ position: "absolute", right: 0, top: 44, width: 340, background: "#0e0e1a", border: "1px solid #1e1e38", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 1000, maxHeight: 400, overflowY: "auto" }}>
+                  <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e1e38", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9" }}>🔔 Notificaciones</span>
+                    <button onClick={() => setShowNotif(false)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 16 }}>✕</button>
+                  </div>
+                  {notificaciones.length === 0 ? (
+                    <div style={{ padding: 24, textAlign: "center", color: "#475569", fontSize: 13 }}>Sin notificaciones</div>
+                  ) : (
+                    notificaciones.map(n => (
+                      <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid #0a0a14", background: n.leida ? "transparent" : "rgba(124,58,237,0.05)" }}>
+                        <div style={{ fontSize: 12, color: n.leida ? "#475569" : "#f1f5f9", fontWeight: n.leida ? 400 : 600 }}>{n.mensaje}</div>
+                        <div style={{ fontSize: 10, color: "#374151", marginTop: 4 }}>{new Date(n.created_at).toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <button onClick={onLogout} style={S.ghost}>Salir</button>
           </div>
         </div>
