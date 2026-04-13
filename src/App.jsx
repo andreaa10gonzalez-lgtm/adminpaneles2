@@ -178,6 +178,7 @@ const db = {
     }
   },
   updateCajaComment: async (tid, fecha, turno_id, comentario) => supabase.from("cajas").update({ comentario_dueno: comentario }).eq("tenant_id", tid).eq("fecha", fecha).eq("turno_id", turno_id),
+  deleteCaja: async (id) => supabase.from("cajas").delete().eq("id", id),
 
   // Jugadores
   getJugadores: async (tid) => { const { data } = await supabase.from("jugadores").select("*").eq("tenant_id", tid); return data || []; },
@@ -619,6 +620,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [newEmpForm, setNewEmpForm] = useState({ nombre: "", usuario: "", pass: "", horario_inicio: "", horario_fin: "", dias: DIAS.map(d => d.id), horarios: {} });
   const [newDest, setNewDest] = useState({ alias: "", titular: "", cbu: "" });
   const [cajaComment, setCajaComment] = useState({});
+  const [editCajaData, setEditCajaData] = useState(null);
   const [selectedDay, setSelectedDay] = useState(todayStr());
   const [empHistoryId, setEmpHistoryId] = useState(null);
   const [jugSeg, setJugSeg] = useState(null);
@@ -718,6 +720,20 @@ const OwnerDashboard = ({ session, onLogout }) => {
     await db.updateCajaComment(tid, fecha, turno_id, text);
     setCajas(await db.getCajas(tid));
     showToast("💬 Comentario guardado");
+  };
+
+  const deleteCajaOwner = async (id) => {
+    if (!window.confirm("¿Eliminar este turno? No se puede deshacer.")) return;
+    await db.deleteCaja(id);
+    setCajas(await db.getCajas(tid));
+    showToast("🗑️ Turno eliminado");
+  };
+
+  const startEditCaja = (c) => {
+    setEditCajaData({ ...c, _id: c.id });
+    setCajaTab("cargar");
+    setCajaForm({ date: c.fecha, empleado: c.empleado_nombre, inicio: { ...c.inicio }, cierre: { ...c.cierre }, bajas: c.bajas || [], bonos: c.bonos || [] });
+    showToast("✏️ Editando turno — modificá y guardá");
   };
 
   // Entries
@@ -1097,13 +1113,19 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       const commentKey = c.fecha + c.turno_id;
                       return (
                         <div key={commentKey} style={{ background: hasDif ? "#1a0808" : C.card, border: `1px solid ${hasDif ? "#7f1d1d" : C.border}`, borderRadius: 14 }}>
-                          <div onClick={() => setExpandedCaja(isExp ? null : commentKey)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", cursor: "pointer", flexWrap: "wrap", gap: 8 }}>
-                            <div><span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span><span style={{ marginLeft: 10, fontSize: 11, color: "#475569" }}>{c.turnoLabel}</span><span style={{ marginLeft: 10, fontSize: 11, color: "#9f67ff" }}>· 👤 {c.empleado_nombre}</span></div>
-                            <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", flexWrap: "wrap", gap: 8 }}>
+                            <div onClick={() => setExpandedCaja(isExp ? null : commentKey)} style={{ cursor: "pointer", flex: 1 }}>
+                              <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
+                              <span style={{ marginLeft: 10, fontSize: 11, color: "#475569" }}>{c.turnoLabel}</span>
+                              <span style={{ marginLeft: 10, fontSize: 11, color: "#9f67ff" }}>· 👤 {c.empleado_nombre}</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                               <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ color: c.mov >= 0 ? "#4ade80" : "#f87171", fontWeight: 700, fontSize: 13 }}>{fmt(c.mov)}</div></div>
-                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ color: hasDif ? "#f87171" : "#4ade80", fontWeight: 800, fontFamily: "'Inter',sans-serif", fontSize: 14 }}>{c.dif > 0 ? "+" : ""}{fmt(c.dif)}</div></div>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ color: hasDif ? "#f87171" : "#4ade80", fontWeight: 800, fontSize: 14 }}>{c.dif > 0 ? "+" : ""}{fmt(c.dif)}</div></div>
                               <Badge ok={!hasDif} />
-                              <span style={{ color: "#475569", fontSize: 11 }}>{isExp ? "▲" : "▼"}</span>
+                              <button onClick={() => startEditCaja(c)} style={{ background: "#1a1030", border: "1px solid #4c1d95", color: "#a78bfa", padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>✏️</button>
+                              <button onClick={() => deleteCajaOwner(c.id)} style={S.danger}>🗑️</button>
+                              <span onClick={() => setExpandedCaja(isExp ? null : commentKey)} style={{ color: "#475569", fontSize: 11, cursor: "pointer" }}>{isExp ? "▲" : "▼"}</span>
                             </div>
                           </div>
                           {isExp && (
@@ -1707,7 +1729,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
           <div>
             <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#c084fc" }}>⚙️ Ajustes</h2>
             <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-              {[{ id: "billeteras", label: "💳 Billeteras" }, { id: "empleados", label: "👥 Empleados" }, { id: "bajas", label: "📤 Destinos Bajas" }, { id: "negocio", label: "🏷️ Negocio" }].map(t => (<button key={t.id} onClick={() => setSettingsTab(t.id)} style={S.subBtn(settingsTab === t.id)}>{t.label}</button>))}
+              {[{ id: "billeteras", label: "💳 Billeteras" }, { id: "empleados", label: "👥 Empleados" }, { id: "sueldos", label: "💵 Sueldos" }, { id: "bajas", label: "📤 Destinos Bajas" }, { id: "negocio", label: "🏷️ Negocio" }].map(t => (<button key={t.id} onClick={() => setSettingsTab(t.id)} style={S.subBtn(settingsTab === t.id)}>{t.label}</button>))}
             </div>
 
             {settingsTab === "billeteras" && (
@@ -1833,6 +1855,115 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   </div>
                   <div style={{ marginBottom: 12 }}><label style={S.label}>CBU o Alias</label><input type="text" value={newDest.cbu} placeholder="CBU o alias de la cuenta" onChange={e => setNewDest({ ...newDest, cbu: e.target.value })} style={{ ...S.input, fontFamily: "monospace" }} /></div>
                   <button onClick={addDest} style={S.btn}>Agregar destino</button>
+                </div>
+              </div>
+            )}
+
+            {settingsTab === "sueldos" && (
+              <div style={{ maxWidth: 680 }}>
+                <div style={{ ...S.card, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, color: "#9f67ff", fontWeight: 700, marginBottom: 4 }}>💵 Configuración de sueldos</div>
+                  <div style={{ fontSize: 12, color: "#475569", marginBottom: 16 }}>Definí el valor hora y las horas por día de cada empleado. El sistema calcula el sueldo automáticamente.</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {empleados.filter(e => e.activo).map(emp => (
+                      <div key={emp.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                          <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14, minWidth: 140 }}>👤 {emp.nombre}</div>
+                          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                            <div>
+                              <label style={S.label}>Valor hora ($)</label>
+                              <input type="number" value={emp.valor_hora || ""} placeholder="0" style={{ ...S.input, width: 130, fontSize: 13 }}
+                                onChange={e => setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, valor_hora: e.target.value } : x))}
+                                onBlur={e => { db.updateEmpleado(emp.id, { valor_hora: +e.target.value || 0 }); }} />
+                            </div>
+                            <div>
+                              <label style={S.label}>Horas por día</label>
+                              <input type="number" value={emp.horas_por_dia || ""} placeholder="8" style={{ ...S.input, width: 100, fontSize: 13 }}
+                                onChange={e => setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, horas_por_dia: e.target.value } : x))}
+                                onBlur={e => { db.updateEmpleado(emp.id, { horas_por_dia: +e.target.value || 8 }); }} />
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>Día / Semana / Mes</div>
+                              <div style={{ fontSize: 13, color: "#4ade80", fontWeight: 700 }}>
+                                {fmt((emp.valor_hora || 0) * (emp.horas_por_dia || 8))} · {fmt((emp.valor_hora || 0) * (emp.horas_por_dia || 8) * 6)} · {fmt((emp.valor_hora || 0) * (emp.horas_por_dia || 8) * 26)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={S.card}>
+                  <div style={{ fontSize: 13, color: "#9f67ff", fontWeight: 700, marginBottom: 16 }}>🧮 Calcular liquidación</div>
+                  {(() => {
+                    const [liquidPeriodo, setLiquidPeriodo] = React.useState("mes");
+                    const [liquidDesde, setLiquidDesde] = React.useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
+                    const [liquidHasta, setLiquidHasta] = React.useState(todayStr);
+                    const periodos = [
+                      { id: "semana", label: "Esta semana", calcDias: () => { const h = new Date(); const ini = new Date(h); ini.setDate(h.getDate() - h.getDay() + 1); return Math.round((h - ini) / 86400000) + 1; } },
+                      { id: "quincena", label: "Quincena", calcDias: () => { const d = new Date().getDate(); return d <= 15 ? d : d - 15; } },
+                      { id: "mes", label: "Este mes", calcDias: () => new Date().getDate() },
+                      { id: "personalizado", label: "Personalizado", calcDias: () => Math.max(1, Math.round((new Date(liquidHasta) - new Date(liquidDesde)) / 86400000) + 1) },
+                    ];
+                    const periodoActual = periodos.find(p => p.id === liquidPeriodo);
+                    const dias = periodoActual?.calcDias() || 1;
+                    return (
+                      <div>
+                        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                          {periodos.map(p => (
+                            <button key={p.id} onClick={() => setLiquidPeriodo(p.id)} style={S.subBtn(liquidPeriodo === p.id)}>{p.label}</button>
+                          ))}
+                        </div>
+                        {liquidPeriodo === "personalizado" && (
+                          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                            <div style={{ flex: 1 }}><label style={S.label}>Desde</label><input type="date" value={liquidDesde} onChange={e => setLiquidDesde(e.target.value)} style={S.input} /></div>
+                            <div style={{ flex: 1 }}><label style={S.label}>Hasta</label><input type="date" value={liquidHasta} onChange={e => setLiquidHasta(e.target.value)} style={S.input} /></div>
+                          </div>
+                        )}
+                        <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 16, fontSize: 12, color: "#9f67ff" }}>
+                          📅 Calculando para <strong>{dias} día{dias !== 1 ? "s" : ""}</strong> · {periodoActual?.label}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {empleados.filter(e => e.activo && e.valor_hora > 0).map(emp => {
+                            const diasTrabajados = (emp.dias || DIAS.map(d => d.id)).length;
+                            const proporcion = diasTrabajados / 7;
+                            const diasEfectivos = Math.round(dias * proporcion);
+                            const total = (emp.valor_hora || 0) * (emp.horas_por_dia || 8) * diasEfectivos;
+                            return (
+                              <div key={emp.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {emp.nombre}</div>
+                                  <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
+                                    {diasEfectivos} días · {emp.horas_por_dia || 8}h/día · ${(emp.valor_hora || 0).toLocaleString("es-AR")}/h
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                  <div style={{ fontSize: 22, fontWeight: 800, color: "#4ade80" }}>{fmt(total)}</div>
+                                  <div style={{ fontSize: 11, color: "#475569" }}>a pagar</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {empleados.filter(e => e.activo && e.valor_hora > 0).length === 0 && (
+                            <div style={{ textAlign: "center", padding: 24, color: "#475569", fontSize: 13 }}>Configurá el valor hora de los empleados arriba para ver los cálculos.</div>
+                          )}
+                          {empleados.filter(e => e.activo && e.valor_hora > 0).length > 0 && (
+                            <div style={{ background: "linear-gradient(135deg,rgba(74,222,128,0.08),rgba(16,185,129,0.04))", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div style={{ fontWeight: 700, color: "#4ade80", fontSize: 14 }}>💰 Total a pagar</div>
+                              <div style={{ fontSize: 24, fontWeight: 800, color: "#4ade80" }}>
+                                {fmt(empleados.filter(e => e.activo && e.valor_hora > 0).reduce((sum, emp) => {
+                                  const diasTrabajados = (emp.dias || DIAS.map(d => d.id)).length;
+                                  const diasEfectivos = Math.round(dias * diasTrabajados / 7);
+                                  return sum + (emp.valor_hora || 0) * (emp.horas_por_dia || 8) * diasEfectivos;
+                                }, 0))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
