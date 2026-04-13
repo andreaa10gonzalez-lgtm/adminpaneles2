@@ -59,7 +59,9 @@ const parseCSV = (text, existingPFS = {}) => {
     if (cols.length < 5) return;
     const date = cols[0].slice(0, 10).replace(/\//g, "-");
     if (!date.match(/\d{4}-\d{2}-\d{2}/)) return;
-    events.push({ date, tipo: cols[1].trim().toLowerCase(), jugador: cols[3].trim(), monto: Math.abs(parseMonto(cols[4])) });
+    const rawDate = cols[0].trim();
+    const timePart = rawDate.length > 10 ? rawDate.slice(11, 19) : "00:00:00";
+    events.push({ date, time: timePart, tipo: cols[1].trim().toLowerCase(), jugador: cols[3].trim(), monto: Math.abs(parseMonto(cols[4])) });
   });
   events.sort((a, b) => a.date.localeCompare(b.date));
   const newPFS = { ...existingPFS };
@@ -99,6 +101,7 @@ const parseCSV = (text, existingPFS = {}) => {
     newPFS,
     newPlayers: Object.entries(newPFS).filter(([k]) => !existingPFS[k]).map(([nombre, primera_vez]) => ({ nombre, primera_vez })),
     jugadorStats: Object.values(jugMesStats),
+    transactions: events.map(e => ({ fecha: e.date, hora: e.time, tipo: e.tipo, jugador: e.jugador, monto: e.monto })),
   };
 };
 
@@ -183,6 +186,8 @@ const db = {
   // Jugadores
   getJugadores: async (tid) => { const { data } = await supabase.from("jugadores").select("*").eq("tenant_id", tid); return data || []; },
   upsertJugadores: async (players) => supabase.from("jugadores").upsert(players, { onConflict: "tenant_id,nombre" }),
+  getTransactions: async (tid, fecha) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).eq("fecha", fecha).order("hora"); return data || []; },
+  upsertTransactions: async (txs) => supabase.from("panel_transactions").upsert(txs, { onConflict: "tenant_id,fecha,hora,jugador,tipo" }),
   getJugadorStats: async (tid, mes) => { const { data } = await supabase.from("jugador_stats").select("*").eq("tenant_id", tid).eq("mes", mes); return data || []; },
   upsertJugadorStats: async (stats) => supabase.from("jugador_stats").upsert(stats, { onConflict: "tenant_id,nombre,mes" }),
 
@@ -321,6 +326,7 @@ const EmployeeView = ({ session, onLogout }) => {
   const [entries, setEntries] = useState([]);
   const [tab, setTab] = useState("cargar");
   const [editApertura, setEditApertura] = useState(false);
+  const [turnoTxs, setTurnoTxs] = useState(null);
   const horarioLabel = getHorarioLabel(session);
   const [form, setForm] = useState({ date: todayStr(), turnoLabel: horarioLabel || "Mi turno", inicio: {}, cierre: {}, bajas: [], bonos: [] });
   const [toast, setToast] = useState("");
@@ -370,13 +376,37 @@ const EmployeeView = ({ session, onLogout }) => {
     }
   }, [form.date, cajas]);
 
+  // Load transactions for current date filtered by turno hours
+  useEffect(() => {
+    if (!form.date) return;
+    db.getTransactions(tid, form.date).then(txs => {
+      if (!txs || txs.length === 0) { setTurnoTxs(null); return; }
+      const diaKey = DIA_MAP[new Date(form.date + "T12:00:00").getDay()];
+      const hd = session.horarios_dia || session.horarios || {};
+      const horIni = hd[diaKey + "_ini"] || session.horario_inicio || "";
+      const horFin = hd[diaKey + "_fin"] || session.horario_fin || "";
+      let filtered = txs;
+      if (horIni) {
+        filtered = txs.filter(t => {
+          const h = (t.hora || "00:00:00").slice(0, 5);
+          if (horFin && horFin > horIni) return h >= horIni && h <= horFin;
+          if (horFin && horFin < horIni) return h >= horIni || h <= horFin;
+          return h >= horIni;
+        });
+      }
+      const cargas = filtered.filter(t => t.tipo === "carga").reduce((s, t) => s + (+t.monto || 0), 0);
+      const retiros = filtered.filter(t => t.tipo === "retiro").reduce((s, t) => s + (+t.monto || 0), 0);
+      setTurnoTxs({ cargas: Math.round(cargas), retiros: Math.round(retiros), neto: Math.round(cargas - retiros), cant: filtered.length, horIni, horFin });
+    });
+  }, [form.date]);
+
   const allBills = config?.billeteras || [];
   const bills = (session.billeteras || []).length > 0 ? allBills.filter(b => (session.billeteras || []).includes(b.id)) : allBills;
   const destinos = config?.destinos_bajas || [];
   const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(form, bills);
   const de = entries.find(e => e.fecha === form.date);
-  // Comparamos el movimiento real de caja contra el neto total del dia del panel
-  const pn = de ? (de.cargas - de.retiros) : null;
+  // Comparamos el movimiento real de caja contra el neto del turno (filtrado por horario)
+  const pn = turnoTxs ? turnoTxs.neto : (de ? (de.cargas - de.retiros) : null);
   const dif = pn !== null ? mov - pn : null;
   const hasAlert = dif !== null && Math.abs(dif) > 100;
 
@@ -573,17 +603,96 @@ const EmployeeView = ({ session, onLogout }) => {
                 <BajasForm />
                 <BonosForm />
                 {bills.some(b => form.cierre[b.id]) && (
-                  <div style={{ background: hasAlert ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: `1px solid ${hasAlert ? "#7f1d1d" : "#14532d"}`, borderRadius: 14, padding: "14px 18px", marginBottom: 14 }}>
-                    <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div>
-                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                      <div><div style={{ fontSize: 10, color: "#475569" }}>Mov. caja</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>
-                      {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}
-                      {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}
-                      <div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>
-                      {pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado (panel)</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}
-                      {dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: hasAlert ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}
+                  <div style={{ background: "#0a0a14", border: `1px solid ${hasAlert ? "#7f1d1d" : "#1e1e38"}`, borderRadius: 14, padding: "18px 20px", marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#9f67ff", marginBottom: 16 }}>📋 Resumen del turno</div>
+
+                    {/* BLOQUE 1: Lo que dio la caja */}
+                    <div style={{ background: "#07070f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>💼 Lo que dio la caja</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                          <span style={{ color: "#94a3b8" }}>Cierre de billeteras</span>
+                          <span style={{ color: "#38bdf8", fontWeight: 700 }}>{fmt(tC)}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                          <span style={{ color: "#94a3b8" }}>Apertura de billeteras</span>
+                          <span style={{ color: "#f87171", fontWeight: 700 }}>− {fmt(tI)}</span>
+                        </div>
+                        {totalBajas > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#94a3b8" }}>Bajas realizadas <span style={{ fontSize: 11, color: "#475569" }}>(plata que salió)</span></span>
+                            <span style={{ color: "#fbbf24", fontWeight: 700 }}>+ {fmt(totalBajas)}</span>
+                          </div>
+                        )}
+                        {totalBonos > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#94a3b8" }}>Bonos entregados</span>
+                            <span style={{ color: "#a78bfa", fontWeight: 700 }}>− {fmt(totalBonos)}</span>
+                          </div>
+                        )}
+                        <div style={{ borderTop: "1px solid #1e1e38", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14 }}>Total movimiento de caja</span>
+                          <span style={{ color: mov >= 0 ? "#4ade80" : "#f87171", fontWeight: 800, fontSize: 20 }}>{fmt(mov)}</span>
+                        </div>
+                      </div>
                     </div>
-                    {hasAlert && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>⚠️ Diferencia significativa</div>}
+
+                    {/* BLOQUE 2: Lo que marcó la plataforma en el horario del turno */}
+                    {(turnoTxs || de) && (
+                      <div style={{ background: "#07070f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>📊 Lo que marcó la plataforma</div>
+                        {turnoTxs?.horIni && (
+                          <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>
+                            Filtrado por tu horario: {turnoTxs.horIni}{turnoTxs.horFin ? ` – ${turnoTxs.horFin}` : ""} · {turnoTxs.cant} transacciones
+                          </div>
+                        )}
+                        {!turnoTxs?.horIni && de && (
+                          <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>Total del día (sin horario configurado)</div>
+                        )}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#94a3b8" }}>Cargas</span>
+                            <span style={{ color: "#4ade80", fontWeight: 700 }}>{fmt(turnoTxs ? turnoTxs.cargas : de.cargas)}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                            <span style={{ color: "#94a3b8" }}>Retiros</span>
+                            <span style={{ color: "#f87171", fontWeight: 700 }}>− {fmt(turnoTxs ? turnoTxs.retiros : de.retiros)}</span>
+                          </div>
+                          <div style={{ borderTop: "1px solid #1e1e38", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14 }}>Neto del turno</span>
+                            <span style={{ color: "#a78bfa", fontWeight: 800, fontSize: 20 }}>{fmt(turnoTxs ? turnoTxs.neto : (de.cargas - de.retiros))}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BLOQUE 3: Diferencia final */}
+                    {dif !== null && (
+                      <div style={{ background: hasAlert ? "rgba(248,113,113,0.07)" : "rgba(74,222,128,0.07)", border: `1px solid ${hasAlert ? "#7f1d1d" : "#14532d"}`, borderRadius: 12, padding: "14px 16px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: hasAlert ? "#f87171" : "#4ade80" }}>
+                              {hasAlert ? "⚠️ Hay una diferencia" : "✅ La caja cierra bien"}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
+                              {hasAlert
+                                ? `La caja dio ${dif > 0 ? fmt(dif) + " más" : fmt(Math.abs(dif)) + " menos"} que el panel`
+                                : "El movimiento de caja coincide con el panel"}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: hasAlert ? "#f87171" : "#4ade80" }}>
+                              {dif > 0 ? "+" : ""}{fmt(dif)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {!de && !turnoTxs && (
+                      <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#fbbf24" }}>
+                        ℹ️ No hay datos del panel para esta fecha — no se puede comparar todavía.
+                      </div>
+                    )}
                   </div>
                 )}
                 <button onClick={handleSave} style={{ ...S.btn, width: "100%" }}>💾 Guardar cierre de turno</button>
@@ -771,8 +880,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
     reader.onload = ev => {
       try {
         const existingPFS = Object.fromEntries(jugadores.map(j => [j.nombre, j.primera_vez]));
-        const { dailyEntries, newPFS, newPlayers, jugadorStats } = parseCSV(ev.target.result, existingPFS);
-        setImportPreview({ file: file.name, data: dailyEntries, newPlayers, totalNew: newPlayers.length, jugadorStats });
+        const { dailyEntries, newPFS, newPlayers, jugadorStats, transactions } = parseCSV(ev.target.result, existingPFS);
+        setImportPreview({ file: file.name, data: dailyEntries, newPlayers, totalNew: newPlayers.length, jugadorStats, transactions });
       } catch (_) { showToast("❌ Error al leer el archivo"); }
       setImporting(false);
     };
@@ -794,9 +903,14 @@ const OwnerDashboard = ({ session, onLogout }) => {
     }
     if (importPreview.jugadorStats?.length > 0) {
       const statsToSave = importPreview.jugadorStats.map(s => ({ ...s, tenant_id: tid }));
-      // Guardar en lotes de 200 para no superar limites
       for (let i = 0; i < statsToSave.length; i += 200) {
         await db.upsertJugadorStats(statsToSave.slice(i, i + 200));
+      }
+    }
+    if (importPreview.transactions?.length > 0) {
+      const txs = importPreview.transactions.map(t => ({ ...t, tenant_id: tid }));
+      for (let i = 0; i < txs.length; i += 200) {
+        await db.upsertTransactions(txs.slice(i, i + 200));
       }
     }
     await loadAll();
