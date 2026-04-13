@@ -375,7 +375,8 @@ const EmployeeView = ({ session, onLogout }) => {
   const destinos = config?.destinos_bajas || [];
   const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(form, bills);
   const de = entries.find(e => e.fecha === form.date);
-  const pn = de ? (de.cargas - de.retiros) / 3 : null;
+  // Comparamos el movimiento real de caja contra el neto total del dia del panel
+  const pn = de ? (de.cargas - de.retiros) : null;
   const dif = pn !== null ? mov - pn : null;
   const hasAlert = dif !== null && Math.abs(dif) > 100;
 
@@ -579,7 +580,7 @@ const EmployeeView = ({ session, onLogout }) => {
                       {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}
                       {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}
                       <div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>
-                      {pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado (⅓)</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}
+                      {pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado (panel)</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}
                       {dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: hasAlert ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}
                     </div>
                     {hasAlert && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>⚠️ Diferencia significativa</div>}
@@ -714,6 +715,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
     const { error } = await db.upsertCaja({ tenant_id: tid, fecha: cajaForm.date, turno_id: turnoId, turno_label: turnoLabel, empleado_nombre: cajaForm.empleado, inicio: cajaForm.inicio, cierre: cajaForm.cierre, bajas: cajaForm.bajas, bonos: cajaForm.bonos, saved_at: new Date().toISOString() });
     if (error) { showToast("❌ Error al guardar: " + error.message); return; }
     setCajas(await db.getCajas(tid));
+    setEditCajaData(null);
     showToast("✅ Caja guardada"); setCajaTab("historial");
   };
   const saveComment = async (fecha, turno_id, text) => {
@@ -830,7 +832,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
   const cajaHistorial = cajas.map(c => {
     const de = entries.find(e => e.fecha === c.fecha);
-    const pn = de ? (de.cargas - de.retiros) / 3 : 0;
+    // pn = neto total del panel del dia (para comparar con suma de todos los turnos)
+    const pn = de ? (de.cargas - de.retiros) : 0;
     const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(c, bills);
     return { ...c, turnoLabel: c.turno_label || c.turno_id, tI, tC, totalBajas, totalBonos, mov, pn, dif: mov - pn };
   }).sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.turno_id || "").localeCompare(a.turno_id || ""));
@@ -1082,18 +1085,27 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   {cajaForm.empleado && (() => { const emp = empleados.find(e => e.nombre === cajaForm.empleado); return emp?.horario_inicio ? <div style={{ background: "#1a0533", border: "1px solid #4c1d95", borderRadius: 9, padding: "8px 12px", fontSize: 12 }}><span style={{ color: "#475569" }}>⏰ </span><span style={{ color: "#c084fc", fontWeight: 700 }}>{emp.horario_inicio}{emp.horario_fin ? " – " + emp.horario_fin : ""}</span></div> : null; })()}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {editCajaData && (
+                    <div style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: 12, padding: "10px 16px", fontSize: 12, color: "#a78bfa", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>✏️ Editando turno — todos los campos son editables</span>
+                      <button onClick={() => { setEditCajaData(null); setCajaForm({ date: todayStr(), empleado: "", inicio: {}, cierre: {}, bajas: [], bonos: [] }); }} style={{ background: "none", border: "1px solid #4c1d95", color: "#a78bfa", padding: "4px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>✕ Cancelar</button>
+                    </div>
+                  )}
                   {[{ label: "🌅 Apertura", fk: "inicio", color: "#38bdf8", ro: true }, { label: "🌆 Cierre", fk: "cierre", color: "#f87171", ro: false }].map(col => {
                     const empActual = empleados.find(e => e.nombre === cajaForm.empleado);
                     const empBills = (empActual?.billeteras || []).length > 0 ? bills.filter(b => (empActual.billeteras || []).includes(b.id)) : bills;
                     const total = empBills.reduce((s, b) => s + (+(cajaForm[col.fk][b.id] || 0)), 0);
-                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = col.ro && !!cajaForm.inicio[b.id]; return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="number" value={cajaForm[col.fk][b.id] || ""} placeholder="0" readOnly={isAuto} onChange={e => setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: e.target.value } })} style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
+                    // En modo edicion la apertura siempre es editable
+                    const isEditing = !!editCajaData;
+                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = col.ro && !!cajaForm.inicio[b.id] && !isEditing; return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="number" value={cajaForm[col.fk][b.id] || ""} placeholder="0" readOnly={isAuto} onChange={e => setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: e.target.value } })} style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
                   {bills.some(b => cajaForm.cierre[b.id]) && (() => {
                     const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(cajaForm, bills);
                     const de = entries.find(e => e.fecha === cajaForm.date);
-                    const pn = de ? (de.cargas - de.retiros) / 3 : null;
+                    // Comparamos mov real de caja vs neto total del panel del dia
+                    const pn = de ? (de.cargas - de.retiros) : null;
                     const dif = pn !== null ? mov - pn : null;
                     const al = dif !== null && Math.abs(dif) > 100;
                     return (<div style={{ background: al ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: `1px solid ${al ? "#7f1d1d" : "#14532d"}`, borderRadius: 14, padding: "14px 18px" }}><div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div><div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}><div><div style={{ fontSize: 10, color: "#475569" }}>Mov.</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>{totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}{totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}<div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>{pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}{dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: al ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}</div>{al && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>⚠️ Diferencia significativa</div>}</div>);
@@ -1695,7 +1707,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
                           {empCajas.map(c => {
                             const hasDif = Math.abs(c.dif || 0) > 100;
                             const de = entries.find(e => e.fecha === c.fecha);
-                            const pn = de ? (de.cargas - de.retiros) / 3 : null;
+                            // Comparamos mov real de caja vs neto total del panel del dia
+                    const pn = de ? (de.cargas - de.retiros) : null;
                             return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "#1a0808" : "#0a0a14", border: `1px solid ${hasDif ? "#7f1d1d" : C.border}`, borderRadius: 12, padding: "13px 15px" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                                 <div>
@@ -1703,7 +1716,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                   <span style={{ fontSize: 11, color: "#475569", marginLeft: 10 }}>{c.turnoLabel}</span>
                                 </div>
                                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f87171" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#4ade80" : "#f87171" }, ...(pn !== null ? [{ label: "Esperado (⅓)", v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: c.dif, col: hasDif ? "#f87171" : "#4ade80" }].map(x => (
+                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f87171" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#4ade80" : "#f87171" }, ...(pn !== null ? [{ label: "Esperado (panel)", v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: c.dif, col: hasDif ? "#f87171" : "#4ade80" }].map(x => (
                                     <div key={x.label} style={{ textAlign: "right" }}>
                                       <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
                                       <div style={{ color: x.col, fontWeight: 700, fontSize: 12 }}>{x.label === "Diferencia" && c.dif > 0 ? "+" : ""}{fmt(x.v)}</div>
