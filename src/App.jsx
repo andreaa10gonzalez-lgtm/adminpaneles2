@@ -65,12 +65,28 @@ const parseCSV = (text, existingPFS = {}) => {
   const newPFS = { ...existingPFS };
   events.forEach(({ jugador, date }) => { if (jugador && !newPFS[jugador]) newPFS[jugador] = date; });
   const dm = {};
+  // Stats por jugador por mes
+  const jugMesStats = {};
   events.forEach(({ date, tipo, jugador, monto }) => {
     if (!dm[date]) dm[date] = { date, cargas: 0, retiros: 0, mov: 0, jug: new Set(), new: new Set() };
     if (tipo === "carga") dm[date].cargas += monto;
     else if (tipo === "retiro") dm[date].retiros += monto;
     dm[date].mov++; dm[date].jug.add(jugador);
     if (newPFS[jugador] === date && !existingPFS[jugador]) dm[date].new.add(jugador);
+    // Acumular stats por jugador por mes
+    if (jugador) {
+      const mes = date.slice(0, 7);
+      const key = jugador + "|" + mes;
+      if (!jugMesStats[key]) jugMesStats[key] = { nombre: jugador, mes, total_cargas: 0, total_retiros: 0, cant_cargas: 0, cant_retiros: 0, max_carga: 0 };
+      if (tipo === "carga") {
+        jugMesStats[key].total_cargas += monto;
+        jugMesStats[key].cant_cargas += 1;
+        jugMesStats[key].max_carga = Math.max(jugMesStats[key].max_carga, monto);
+      } else if (tipo === "retiro") {
+        jugMesStats[key].total_retiros += monto;
+        jugMesStats[key].cant_retiros += 1;
+      }
+    }
   });
   return {
     dailyEntries: Object.values(dm).map((d) => ({
@@ -82,6 +98,7 @@ const parseCSV = (text, existingPFS = {}) => {
     })).sort((a, b) => a.date.localeCompare(b.date)),
     newPFS,
     newPlayers: Object.entries(newPFS).filter(([k]) => !existingPFS[k]).map(([nombre, primera_vez]) => ({ nombre, primera_vez })),
+    jugadorStats: Object.values(jugMesStats),
   };
 };
 
@@ -165,6 +182,8 @@ const db = {
   // Jugadores
   getJugadores: async (tid) => { const { data } = await supabase.from("jugadores").select("*").eq("tenant_id", tid); return data || []; },
   upsertJugadores: async (players) => supabase.from("jugadores").upsert(players, { onConflict: "tenant_id,nombre" }),
+  getJugadorStats: async (tid, mes) => { const { data } = await supabase.from("jugador_stats").select("*").eq("tenant_id", tid).eq("mes", mes); return data || []; },
+  upsertJugadorStats: async (stats) => supabase.from("jugador_stats").upsert(stats, { onConflict: "tenant_id,nombre,mes" }),
 
   // Campaña
   getCampana: async (tid) => { const { data } = await supabase.from("campana").select("*").eq("tenant_id", tid).single(); return data || { enviados: 0, recuperados: 0, depositos: 0 }; },
@@ -604,6 +623,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [empHistoryId, setEmpHistoryId] = useState(null);
   const [jugSeg, setJugSeg] = useState(null);
   const [jugFiltro, setJugFiltro] = useState("");
+  const [jugadorStats, setJugadorStats] = useState([]);
   const [iaLoading, setIaLoading] = useState(false);
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaPregunta, setIaPregunta] = useState("");
@@ -613,14 +633,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2800); };
 
   const loadAll = async () => {
-    const [cfg, ents, jugs, camp, emps, cajs, notifs] = await Promise.all([
+    const [cfg, ents, jugs, camp, emps, cajs, notifs, stats] = await Promise.all([
       db.getConfig(tid), db.getEntries(tid), db.getJugadores(tid),
       db.getCampana(tid), db.getEmpleados(tid), db.getCajas(tid),
-      db.getNotificaciones(tid),
+      db.getNotificaciones(tid), db.getJugadorStats(tid, cmk()),
     ]);
     setConfig(cfg || { nombre: session.nombre, billeteras: [], destinos_bajas: [] });
     setEntries(ents); setJugadores(jugs); setCampaign(camp); setEmpleados(emps); setCajas(cajs);
     setNotificaciones(notifs || []);
+    setJugadorStats(stats || []);
   };
 
   useEffect(() => { loadAll(); }, []);
@@ -732,8 +753,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
     reader.onload = ev => {
       try {
         const existingPFS = Object.fromEntries(jugadores.map(j => [j.nombre, j.primera_vez]));
-        const { dailyEntries, newPFS, newPlayers } = parseCSV(ev.target.result, existingPFS);
-        setImportPreview({ file: file.name, data: dailyEntries, newPlayers, totalNew: newPlayers.length });
+        const { dailyEntries, newPFS, newPlayers, jugadorStats } = parseCSV(ev.target.result, existingPFS);
+        setImportPreview({ file: file.name, data: dailyEntries, newPlayers, totalNew: newPlayers.length, jugadorStats });
       } catch (_) { showToast("❌ Error al leer el archivo"); }
       setImporting(false);
     };
@@ -752,6 +773,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
     }
     if (importPreview.newPlayers.length > 0) {
       await db.upsertJugadores(importPreview.newPlayers.map(p => ({ tenant_id: tid, nombre: p.nombre, primera_vez: p.primera_vez })));
+    }
+    if (importPreview.jugadorStats?.length > 0) {
+      const statsToSave = importPreview.jugadorStats.map(s => ({ ...s, tenant_id: tid }));
+      // Guardar en lotes de 200 para no superar limites
+      for (let i = 0; i < statsToSave.length; i += 200) {
+        await db.upsertJugadorStats(statsToSave.slice(i, i + 200));
+      }
     }
     await loadAll();
     setImportPreview(null); showToast(`✅ ${importPreview.data.length} días importados`); setActiveTab("resumen");
@@ -772,39 +800,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const cmUnicos = sumK(cmEntries, "jugadores_unicos"), pmUnicos = sumK(pmEntries, "jugadores_unicos");
   const totalPlayers = jugadores.length;
 
-  // Segmentacion de jugadores: distribuimos cargas del mes entre jugadores
-  // Usamos primera_vez para determinar cuando aparecio cada jugador
-  // y calculamos actividad proporcional basada en los dias con datos
-  const jugStatsMap = {};
-  // Primero identificamos todos los jugadores activos en el mes actual
-  // Un jugador es "activo" si aparece en jugadores_nuevos_lista en alguna entry del mes
-  // O si ya estaba antes y el mes tiene entradas
-  const jugadoresActivos = new Set();
-  cmEntries.forEach(e => {
-    (e.jugadores_nuevos_lista || []).forEach(n => jugadoresActivos.add(n));
-  });
-  // Para jugadores que ya existian antes del mes actual, los agregamos a activos
-  const primerDiaMes = cmk() + "-01";
-  jugadores.forEach(j => {
-    if (j.primera_vez && j.primera_vez < primerDiaMes) jugadoresActivos.add(j.nombre);
-  });
-  const totalActivos = Math.max(jugadoresActivos.size, 1);
-  // Distribuimos las cargas de cada dia entre los activos
-  cmEntries.forEach(e => {
-    const activosEseDia = e.jugadoresUnicos || Math.round(totalActivos * 0.6);
-    const cargaPerJug = activosEseDia > 0 ? (e.cargas / activosEseDia) : 0;
-    jugadoresActivos.forEach(nombre => {
-      if (!jugStatsMap[nombre]) jugStatsMap[nombre] = { cargas: 0, dias: 0 };
-      // Solo contamos dias donde el jugador probablemente estuvo activo
-      // Usamos una probabilidad basada en la frecuencia del dia
-      const prob = activosEseDia / totalActivos;
-      if (prob > 0.3) { // si mas del 30% de jugadores estuvieron ese dia
-        jugStatsMap[nombre].cargas += cargaPerJug;
-        jugStatsMap[nombre].dias += 1;
-      }
-    });
-  });
-  const getJugStats = (nombre) => jugStatsMap[nombre] || { cargas: 0, dias: 0 };
+  // Segmentacion de jugadores: usa datos reales de jugador_stats (cargados al importar CSV)
+  // max_carga = la carga mas alta en el mes (para clasificar fuertes/medias/bajas)
+  // cant_cargas = cantidad de cargas en el mes (para alta frecuencia)
+  const getJugStats = (nombre) => {
+    const s = jugadorStats.find(x => x.nombre === nombre);
+    return s || { max_carga: 0, cant_cargas: 0, total_cargas: 0 };
+  };
   const recoveryRate = campaign.enviados > 0 ? ((campaign.recuperados / campaign.enviados) * 100).toFixed(1) : 0;
   const chartData = cmEntries.map(e => ({ dia: e.fecha?.slice(8), Cargas: e.cargas, Retiros: e.retiros, Neto: e.cargas - e.retiros }));
   const compareData = [{ name: "Cargas", Anterior: Math.round(pmCProp), Actual: cmC }, { name: "Retiros", Anterior: Math.round(pmRProp), Actual: cmR }, { name: "Neto", Anterior: Math.round(pmNProp), Actual: cmN }];
@@ -1146,15 +1148,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 { label: "💪 Cargas fuertes", sub: "+$15.000", seg: "fuerte", color: "#4ade80", border: "rgba(74,222,128,0.25)" },
                 { label: "📊 Cargas medias", sub: "$5.000 – $15.000", seg: "media", color: "#fbbf24", border: "rgba(251,191,36,0.25)" },
                 { label: "🔻 Cargas bajas", sub: "Hasta $5.000", seg: "baja", color: "#f87171", border: "rgba(248,113,113,0.25)" },
-                { label: "🔥 Alta frecuencia", sub: "5+ días este mes", seg: "frecuente", color: "#a78bfa", border: "rgba(167,139,250,0.25)" },
+                { label: "🔥 Alta frecuencia", sub: "7+ cargas este mes", seg: "frecuente", color: "#a78bfa", border: "rgba(167,139,250,0.25)" },
               ];
               const getCount = (seg) => {
                 return jugadores.filter(j => {
                   const stats = getJugStats(j.nombre);
-                  if (seg === "fuerte") return stats.cargas >= 15000;
-                  if (seg === "media") return stats.cargas >= 5000 && stats.cargas < 15000;
-                  if (seg === "baja") return stats.cargas > 0 && stats.cargas < 5000;
-                  if (seg === "frecuente") return stats.dias >= 5;
+                  if (seg === "fuerte") return stats.max_carga >= 15000;
+                  if (seg === "media") return stats.max_carga >= 5000 && stats.max_carga < 15000;
+                  if (seg === "baja") return stats.max_carga > 0 && stats.max_carga < 5000;
+                  if (seg === "frecuente") return stats.cant_cargas >= 7;
                   return false;
                 }).length;
               };
@@ -1185,7 +1187,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 {(() => {
                   const filtrados = jugadores.filter(j => {
                     const stats = getJugStats(j.nombre);
-                    const ok = jugSeg === "fuerte" ? stats.cargas >= 15000 : jugSeg === "media" ? stats.cargas >= 5000 && stats.cargas < 15000 : jugSeg === "baja" ? stats.cargas > 0 && stats.cargas < 5000 : stats.dias >= 5;
+                    const ok = jugSeg === "fuerte" ? stats.max_carga >= 15000 : jugSeg === "media" ? stats.max_carga >= 5000 && stats.max_carga < 15000 : jugSeg === "baja" ? stats.max_carga > 0 && stats.max_carga < 5000 : stats.cant_cargas >= 7;
                     return ok && (!jugFiltro || j.nombre.toLowerCase().includes(jugFiltro.toLowerCase()));
                   });
                   if (filtrados.length === 0) return <div style={{ color: "#475569", textAlign: "center", padding: 24 }}>No hay jugadores en este segmento todavía.</div>;
@@ -1199,7 +1201,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                               <div>
                                 <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {j.nombre}</div>
                                 <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
-                                  Primera vez: {j.primera_vez || "—"} · {stats.dias} día{stats.dias !== 1 ? "s" : ""} este mes · est. {fmt(Math.round(stats.cargas))}
+                                  Primera vez: {j.primera_vez || "—"} · {stats.cant_cargas || 0} carga{(stats.cant_cargas || 0) !== 1 ? "s" : ""} este mes · máx: {fmt(stats.max_carga || 0)}
                                   {j.telefono ? ` · 📱 ${j.telefono}` : ""}
                                 </div>
                               </div>
