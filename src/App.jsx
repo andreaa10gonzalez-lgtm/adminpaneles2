@@ -975,50 +975,35 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const compareData = [{ name: "Cargas", Anterior: Math.round(pmCProp), Actual: cmC }, { name: "Retiros", Anterior: Math.round(pmRProp), Actual: cmR }, { name: "Neto", Anterior: Math.round(pmNProp), Actual: cmN }];
   const last7 = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const ds = d.toISOString().slice(0, 10); const e = entries.find(x => x.fecha === ds); return { dia: d.toLocaleDateString("es-AR", { weekday: "short" }), Cargas: e?.cargas || 0, Retiros: e?.retiros || 0 }; }).reverse();
 
-  const cajaHistorial = cajas.map(c => {
-    const de = entries.find(e => e.fecha === c.fecha);
-    // pn = neto total del panel del dia (para comparar con suma de todos los turnos)
-    const pn = calcPnTurno(c.fecha, c.turno_label, de);
-    const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(c, bills);
-    return { ...c, turnoLabel: c.turno_label || c.turno_id, tI, tC, totalBajas, totalBonos, mov, pn, dif: mov - pn };
-  }).sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.turno_id || "").localeCompare(a.turno_id || ""));
-
-  const alertas = cajaHistorial.filter(c => Math.abs(c.dif) > 100);
   // Calcula el neto real del turno usando panel_transactions si existe, sino proporcional
   const calcPnTurno = (fecha, turnoLabel, de) => {
     if (!de) return null;
-    // Try exact from cache
+    const total = de.cargas - de.retiros;
     const cacheKey = fecha + "|" + turnoLabel;
     if (turnoTxsCache[cacheKey] !== undefined) return turnoTxsCache[cacheKey];
-    // Load async and cache
+    // Trigger async load
     if (fecha && turnoLabel) {
       const match = turnoLabel.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
       if (match) {
         db.getTransactions(tid, fecha).then(txs => {
+          const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+          const ini = toMins(match[1]), fin = toMins(match[2]);
           if (!txs || txs.length === 0) {
-            // Fallback to proportional
-            const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
-            const ini = toMins(match[1]), fin = toMins(match[2]);
             const dur = fin > ini ? fin - ini : (1440 - ini + fin);
-            const prop = Math.round((de.cargas - de.retiros) * Math.min(dur / 1440, 1));
-            setTurnoTxsCache(c => ({ ...c, [cacheKey]: prop }));
+            setTurnoTxsCache(prev => ({ ...prev, [cacheKey]: Math.round(total * Math.min(dur / 1440, 1)) }));
           } else {
-            const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
-            const ini = toMins(match[1]), fin = toMins(match[2]);
             const filtered = txs.filter(t => {
-              const h = toMins((t.hora || "00:00").slice(0,5));
+              const h = toMins((t.hora || "00:00").slice(0, 5));
               return fin > ini ? h >= ini && h <= fin : h >= ini || h <= fin;
             });
             const cargas = filtered.filter(t => t.tipo === "carga").reduce((s,t) => s + (+t.monto||0), 0);
             const retiros = filtered.filter(t => t.tipo === "retiro").reduce((s,t) => s + (+t.monto||0), 0);
-            setTurnoTxsCache(c => ({ ...c, [cacheKey]: Math.round(cargas - retiros) }));
+            setTurnoTxsCache(prev => ({ ...prev, [cacheKey]: Math.round(cargas - retiros) }));
           }
         });
       }
     }
-    // Return proportional while loading
-    if (!de) return null;
-    const total = de.cargas - de.retiros;
+    // While loading: return proportional estimate
     const match = turnoLabel?.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
     if (!match) return total;
     const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
@@ -1026,6 +1011,16 @@ const OwnerDashboard = ({ session, onLogout }) => {
     const dur = fin > ini ? fin - ini : (1440 - ini + fin);
     return Math.round(total * Math.min(dur / 1440, 1));
   };
+
+  const cajaHistorial = cajas.map(c => {
+    const de = entries.find(e => e.fecha === c.fecha);
+    // pn = neto real del turno (filtrado por horario)
+    const pn = calcPnTurno(c.fecha, c.turno_label, de);
+    const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(c, bills);
+    return { ...c, turnoLabel: c.turno_label || c.turno_id, tI, tC, totalBajas, totalBonos, mov, pn, dif: mov - pn };
+  }).sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.turno_id || "").localeCompare(a.turno_id || ""));
+
+  const alertas = cajaHistorial.filter(c => Math.abs(c.dif) > 100);
 
 
   const getDaySummary = (date) => {
