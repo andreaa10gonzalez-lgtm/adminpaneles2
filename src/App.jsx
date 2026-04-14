@@ -332,16 +332,16 @@ const EmployeeView = ({ session, onLogout }) => {
   const [form, setForm] = useState({ date: todayStr(), turnoLabel: horarioLabel || "Mi turno", inicio: {}, cierre: {}, bajas: [], bonos: [] });
   const [toast, setToast] = useState("");
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2500); };
-  const diaHoy = DIA_MAP[new Date().getDay()];
+  const diaHoy = DIA_MAP[new Date().getDay()]; // getDay() usa hora local
   const trabajaHoy = !session.dias?.length || session.dias.includes(diaHoy);
 
   // Funcion para obtener el ultimo cierre de cualquier empleado antes de una fecha
   const getLastCierre = (cajs, beforeDate) => {
-    // Busca el cierre mas reciente de cualquier empleado antes de la fecha dada
+    // Normaliza la fecha de corte a solo YYYY-MM-DD
+    const cutoff = (beforeDate || "").slice(0, 10);
     return (cajs || [])
-      .filter(c => c.fecha < beforeDate && c.cierre && Object.keys(c.cierre).length > 0)
+      .filter(c => c.fecha <= cutoff && c.cierre && Object.keys(c.cierre).length > 0)
       .sort((a, b) => {
-        // Ordenar por fecha desc, luego por saved_at desc
         const fechaDiff = b.fecha.localeCompare(a.fecha);
         if (fechaDiff !== 0) return fechaDiff;
         return (b.saved_at || "").localeCompare(a.saved_at || "");
@@ -359,7 +359,7 @@ const EmployeeView = ({ session, onLogout }) => {
       setCajas(cajs);
       // Auto-fill apertura con el ultimo cierre registrado (cualquier empleado)
       const hoy = todayStr();
-      const prev = getLastCierre(cajs, hoy + "Z"); // incluye hoy
+      const prev = getLastCierre(cajs, hoy); // incluye hoy
       if (prev?.cierre) {
         setForm(f => ({ ...f, inicio: { ...prev.cierre } }));
       }
@@ -369,13 +369,13 @@ const EmployeeView = ({ session, onLogout }) => {
   // Re-fill apertura si cambia la fecha
   useEffect(() => {
     if (cajas.length === 0) return;
-    const prev = getLastCierre(cajas, form.date + "Z");
-    if (prev?.cierre) {
+    const prev = getLastCierre(cajas, form.date);
+    if (prev?.cierre && Object.keys(prev.cierre).length > 0) {
       setForm(f => ({ ...f, inicio: { ...prev.cierre } }));
     } else {
       setForm(f => ({ ...f, inicio: {} }));
     }
-  }, [form.date, cajas]);
+  }, [form.date]);
 
   // Load transactions for current date filtered by turno hours
   useEffect(() => {
@@ -599,8 +599,8 @@ const EmployeeView = ({ session, onLogout }) => {
                           return (
                             <div key={b.id} style={{ marginBottom: 10 }}>
                               <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
-                              <input type="text" inputMode="numeric" value={form[col.key][b.id] ?? ""} placeholder="0" readOnly={isAuto}
-                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: v } }); }}
+                              <input type="number" value={form[col.key][b.id] || ""} placeholder="0" readOnly={isAuto}
+                                onChange={e => setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: e.target.value } })}
                                 style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} />
                             </div>
                           );
@@ -788,8 +788,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
   useEffect(() => { loadAll(); }, []);
 
   // Auto-fill apertura caja con el ultimo cierre registrado (cualquier empleado)
+  // NO ejecutar si estamos editando una caja existente
   useEffect(() => {
     if (!cajaForm.empleado) return;
+    if (editCajaData) return; // no pisar la apertura al editar
     const prev = cajas
       .filter(c => c.fecha < cajaForm.date && c.cierre && Object.keys(c.cierre).length > 0)
       .sort((a, b) => {
@@ -1283,7 +1285,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const total = empBills.reduce((s, b) => s + (+(cajaForm[col.fk][b.id] || 0)), 0);
                     // En modo edicion la apertura siempre es editable
                     const isEditing = !!editCajaData;
-                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = col.ro && !!cajaForm.inicio[b.id] && !isEditing; return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={isAuto} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: v } }); }} style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
+                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = col.ro && !!cajaForm.inicio[b.id] && !isEditing; return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="number" value={cajaForm[col.fk][b.id] || ""} placeholder="0" readOnly={isAuto} onChange={e => setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: e.target.value } })} style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
