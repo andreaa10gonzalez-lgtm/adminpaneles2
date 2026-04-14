@@ -25,10 +25,11 @@ const C = {
 // ─── UTILS ───────────────────────────────────────────────────────────────────
 const parseMonto = (s) => parseFloat(String(s || "").replace(/\./g, "").replace(",", ".").trim()) || 0;
 const fmt = (v) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(v || 0);
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const localDateStr = (d) => { const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
+const todayStr = () => localDateStr(new Date());
 const monthLabel = (off = 0) => { const d = new Date(); d.setMonth(d.getMonth() + off); return d.toLocaleString("es-AR", { month: "long", year: "numeric" }); };
-const cmk = () => new Date().toISOString().slice(0, 7);
-const pmk = () => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
+const cmk = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+const pmk = () => { const d = new Date(); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
 const pct = (c, p) => !p ? (c > 0 ? 100 : 0) : (((c - p) / p) * 100).toFixed(1);
 const sumK = (arr, k) => arr.reduce((s, e) => s + (e[k] || 0), 0);
 const cajaKey = (date, tid) => `${date}__${tid}`;
@@ -598,8 +599,8 @@ const EmployeeView = ({ session, onLogout }) => {
                           return (
                             <div key={b.id} style={{ marginBottom: 10 }}>
                               <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
-                              <input type="number" value={form[col.key][b.id] || ""} placeholder="0" readOnly={isAuto}
-                                onChange={e => setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: e.target.value } })}
+                              <input type="text" inputMode="numeric" value={form[col.key][b.id] ?? ""} placeholder="0" readOnly={isAuto}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: v } }); }}
                                 style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} />
                             </div>
                           );
@@ -768,6 +769,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [iaPregunta, setIaPregunta] = useState("");
   const [notificaciones, setNotificaciones] = useState([]);
   const [showNotif, setShowNotif] = useState(false);
+  const [turnoTxsCache, setTurnoTxsCache] = useState({});
   const fileRef = useRef();
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2800); };
 
@@ -974,12 +976,55 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const cajaHistorial = cajas.map(c => {
     const de = entries.find(e => e.fecha === c.fecha);
     // pn = neto total del panel del dia (para comparar con suma de todos los turnos)
-    const pn = de ? (de.cargas - de.retiros) : 0;
+    const pn = calcPnTurno(c.fecha, c.turno_label, de);
     const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(c, bills);
     return { ...c, turnoLabel: c.turno_label || c.turno_id, tI, tC, totalBajas, totalBonos, mov, pn, dif: mov - pn };
   }).sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.turno_id || "").localeCompare(a.turno_id || ""));
 
   const alertas = cajaHistorial.filter(c => Math.abs(c.dif) > 100);
+  // Calcula el neto real del turno usando panel_transactions si existe, sino proporcional
+  const calcPnTurno = (fecha, turnoLabel, de) => {
+    if (!de) return null;
+    // Try exact from cache
+    const cacheKey = fecha + "|" + turnoLabel;
+    if (turnoTxsCache[cacheKey] !== undefined) return turnoTxsCache[cacheKey];
+    // Load async and cache
+    if (fecha && turnoLabel) {
+      const match = turnoLabel.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
+      if (match) {
+        db.getTransactions(tid, fecha).then(txs => {
+          if (!txs || txs.length === 0) {
+            // Fallback to proportional
+            const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+            const ini = toMins(match[1]), fin = toMins(match[2]);
+            const dur = fin > ini ? fin - ini : (1440 - ini + fin);
+            const prop = Math.round((de.cargas - de.retiros) * Math.min(dur / 1440, 1));
+            setTurnoTxsCache(c => ({ ...c, [cacheKey]: prop }));
+          } else {
+            const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+            const ini = toMins(match[1]), fin = toMins(match[2]);
+            const filtered = txs.filter(t => {
+              const h = toMins((t.hora || "00:00").slice(0,5));
+              return fin > ini ? h >= ini && h <= fin : h >= ini || h <= fin;
+            });
+            const cargas = filtered.filter(t => t.tipo === "carga").reduce((s,t) => s + (+t.monto||0), 0);
+            const retiros = filtered.filter(t => t.tipo === "retiro").reduce((s,t) => s + (+t.monto||0), 0);
+            setTurnoTxsCache(c => ({ ...c, [cacheKey]: Math.round(cargas - retiros) }));
+          }
+        });
+      }
+    }
+    // Return proportional while loading
+    if (!de) return null;
+    const total = de.cargas - de.retiros;
+    const match = turnoLabel?.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
+    if (!match) return total;
+    const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+    const ini = toMins(match[1]), fin = toMins(match[2]);
+    const dur = fin > ini ? fin - ini : (1440 - ini + fin);
+    return Math.round(total * Math.min(dur / 1440, 1));
+  };
+
 
   const getDaySummary = (date) => {
     const dayTurnos = cajas.filter(c => c.fecha === date).map(c => {
@@ -1238,15 +1283,21 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const total = empBills.reduce((s, b) => s + (+(cajaForm[col.fk][b.id] || 0)), 0);
                     // En modo edicion la apertura siempre es editable
                     const isEditing = !!editCajaData;
-                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = col.ro && !!cajaForm.inicio[b.id] && !isEditing; return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="number" value={cajaForm[col.fk][b.id] || ""} placeholder="0" readOnly={isAuto} onChange={e => setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: e.target.value } })} style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
+                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = col.ro && !!cajaForm.inicio[b.id] && !isEditing; return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={isAuto} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: v } }); }} style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
                   {bills.some(b => cajaForm.cierre[b.id]) && (() => {
                     const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(cajaForm, bills);
                     const de = entries.find(e => e.fecha === cajaForm.date);
-                    // Comparamos mov real de caja vs neto total del panel del dia
-                    const pn = de ? (de.cargas - de.retiros) : null;
+                    // Comparamos mov real de caja vs neto proporcional al horario
+                    const diaE = DIA_MAP[new Date(cajaForm.date + 'T12:00:00').getDay()];
+                    const empE = empleados.find(e => e.nombre === cajaForm.empleado);
+                    const hdE = empE?.horarios_dia || {};
+                    const hiE = hdE[diaE + '_ini'] || empE?.horario_inicio || '';
+                    const hfE = hdE[diaE + '_fin'] || empE?.horario_fin || '';
+                    const turnoLabelE = hiE && hfE ? hiE + ' – ' + hfE : null;
+                    const pn = calcPnTurno(cajaForm.date, turnoLabelE, de);
                     const dif = pn !== null ? mov - pn : null;
                     const al = dif !== null && Math.abs(dif) > 100;
                     return (<div style={{ background: al ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: `1px solid ${al ? "#7f1d1d" : "#14532d"}`, borderRadius: 14, padding: "14px 18px" }}><div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div><div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}><div><div style={{ fontSize: 10, color: "#475569" }}>Mov.</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>{totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}{totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}<div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>{pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}{dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: al ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}</div>{al && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>⚠️ Diferencia significativa</div>}</div>);
@@ -1848,8 +1899,14 @@ const OwnerDashboard = ({ session, onLogout }) => {
                           {empCajas.map(c => {
                             const hasDif = Math.abs(c.dif || 0) > 100;
                             const de = entries.find(e => e.fecha === c.fecha);
-                            // Comparamos mov real de caja vs neto total del panel del dia
-                    const pn = de ? (de.cargas - de.retiros) : null;
+                            // Comparamos mov real de caja vs neto proporcional al horario
+                    const diaE = DIA_MAP[new Date(cajaForm.date + 'T12:00:00').getDay()];
+                    const empE = empleados.find(e => e.nombre === cajaForm.empleado);
+                    const hdE = empE?.horarios_dia || {};
+                    const hiE = hdE[diaE + '_ini'] || empE?.horario_inicio || '';
+                    const hfE = hdE[diaE + '_fin'] || empE?.horario_fin || '';
+                    const turnoLabelE = hiE && hfE ? hiE + ' – ' + hfE : null;
+                    const pn = calcPnTurno(cajaForm.date, turnoLabelE, de);
                             return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "#1a0808" : "#0a0a14", border: `1px solid ${hasDif ? "#7f1d1d" : C.border}`, borderRadius: 12, padding: "13px 15px" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                                 <div>
