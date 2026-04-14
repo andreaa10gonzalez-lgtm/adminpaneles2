@@ -598,10 +598,10 @@ const EmployeeView = ({ session, onLogout }) => {
                           const isAuto = col.ro && !!form.inicio[b.id] && !editingApertura;
                           return (
                             <div key={b.id} style={{ marginBottom: 10 }}>
-                              <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
+                              <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
                               <input type="number" value={form[col.key][b.id] || ""} placeholder="0" readOnly={isAuto}
                                 onChange={e => setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: e.target.value } })}
-                                style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} />
+                                style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} />
                             </div>
                           );
                         })}
@@ -1280,7 +1280,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const total = empBills.reduce((s, b) => s + (+(cajaForm[col.fk][b.id] || 0)), 0);
                     // En modo edicion la apertura siempre es editable
                     const isEditing = !!editCajaData;
-                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = col.ro && !!cajaForm.inicio[b.id] && !isEditing; return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="number" value={cajaForm[col.fk][b.id] || ""} placeholder="0" readOnly={isAuto} onChange={e => setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: e.target.value } })} style={{ ...S.input, background: isAuto ? "#0a0a12" : "#0a0a16", color: isAuto ? "#4c6a9a" : "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
+                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = false; // apertura siempre editable - auto fill es solo sugerencia return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="number" value={cajaForm[col.fk][b.id] || ""} placeholder="0" readOnly={isAuto} onChange={e => setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: e.target.value } })} style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
@@ -1896,14 +1896,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
                           {empCajas.map(c => {
                             const hasDif = Math.abs(c.dif || 0) > 100;
                             const de = entries.find(e => e.fecha === c.fecha);
-                            // Comparamos mov real de caja vs neto proporcional al horario
-                    const diaE = DIA_MAP[new Date(cajaForm.date + 'T12:00:00').getDay()];
-                    const empE = empleados.find(e => e.nombre === cajaForm.empleado);
-                    const hdE = empE?.horarios_dia || {};
-                    const hiE = hdE[diaE + '_ini'] || empE?.horario_inicio || '';
-                    const hfE = hdE[diaE + '_fin'] || empE?.horario_fin || '';
-                    const turnoLabelE = hiE && hfE ? hiE + ' – ' + hfE : null;
-                    const pn = calcPnTurno(cajaForm.date, turnoLabelE, de);
+                            // Usar el turno_label de la caja para calcular el neto esperado
+                            const pn = calcPnTurno(c.fecha, c.turno_label, de);
                             return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "#1a0808" : "#0a0a14", border: `1px solid ${hasDif ? "#7f1d1d" : C.border}`, borderRadius: 12, padding: "13px 15px" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                                 <div>
