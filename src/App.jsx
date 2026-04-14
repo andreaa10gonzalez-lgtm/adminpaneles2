@@ -51,7 +51,10 @@ const calcCaja = (caja, bills) => {
 
 // ─── CSV PARSER ──────────────────────────────────────────────────────────────
 const parseCSV = (text, existingPFS = {}) => {
-  const lines = text.trim().split("\n").slice(1);
+  const allLines = text.trim().split("\n");
+  // Auto-detect header: skip first line only if it does not start with a date
+  const hasHeader = !allLines[0]?.match(/^\d{4}[\/\-]\d{2}[\/\-]\d{2}/);
+  const lines = hasHeader ? allLines.slice(1) : allLines;
   const events = [];
   lines.forEach((line) => {
     const cols = []; let cur = "", inQ = false;
@@ -599,8 +602,8 @@ const EmployeeView = ({ session, onLogout }) => {
                           return (
                             <div key={b.id} style={{ marginBottom: 10 }}>
                               <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
-                              <input type="number" value={form[col.key][b.id] || ""} placeholder="0" readOnly={isAuto}
-                                onChange={e => setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: e.target.value } })}
+                              <input type="text" inputMode="numeric" value={form[col.key][b.id] ?? ""} placeholder="0" readOnly={isAuto}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: v } }); }}
                                 style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} />
                             </div>
                           );
@@ -726,6 +729,75 @@ const EmployeeView = ({ session, onLogout }) => {
                 <button onClick={handleSave} style={{ ...S.btn, width: "100%" }}>💾 Guardar cierre de turno</button>
               </>
             )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── LIQUIDACION CALC SUBCOMPONENT ───────────────────────────────────────────
+const LiquidacionCalc = ({ empleados }) => {
+  const [liquidPeriodo, setLiquidPeriodo] = useState("mes");
+  const [liquidDesde, setLiquidDesde] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
+  const [liquidHasta, setLiquidHasta] = useState(todayStr);
+  const periodos = [
+    { id: "semana", label: "Esta semana", calcDias: () => { const h = new Date(); const ini = new Date(h); ini.setDate(h.getDate() - h.getDay() + 1); return Math.round((h - ini) / 86400000) + 1; } },
+    { id: "quincena", label: "Quincena", calcDias: () => { const d = new Date().getDate(); return d <= 15 ? d : d - 15; } },
+    { id: "mes", label: "Este mes", calcDias: () => new Date().getDate() },
+    { id: "personalizado", label: "Personalizado", calcDias: () => Math.max(1, Math.round((new Date(liquidHasta) - new Date(liquidDesde)) / 86400000) + 1) },
+  ];
+  const periodoActual = periodos.find(p => p.id === liquidPeriodo);
+  const dias = periodoActual?.calcDias() || 1;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {periodos.map(p => (
+          <button key={p.id} onClick={() => setLiquidPeriodo(p.id)} style={S.subBtn(liquidPeriodo === p.id)}>{p.label}</button>
+        ))}
+      </div>
+      {liquidPeriodo === "personalizado" && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <div style={{ flex: 1 }}><label style={S.label}>Desde</label><input type="date" value={liquidDesde} onChange={e => setLiquidDesde(e.target.value)} style={S.input} /></div>
+          <div style={{ flex: 1 }}><label style={S.label}>Hasta</label><input type="date" value={liquidHasta} onChange={e => setLiquidHasta(e.target.value)} style={S.input} /></div>
+        </div>
+      )}
+      <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 16, fontSize: 12, color: "#9f67ff" }}>
+        Calculando para <strong>{dias} dia{dias !== 1 ? "s" : ""}</strong> · {periodoActual?.label}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {empleados.filter(e => e.activo && e.valor_hora > 0).map(emp => {
+          const diasTrabajados = (emp.dias || DIAS.map(d => d.id)).length;
+          const diasEfectivos = Math.round(dias * diasTrabajados / 7);
+          const total = (emp.valor_hora || 0) * (emp.horas_por_dia || 8) * diasEfectivos;
+          return (
+            <div key={emp.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {emp.nombre}</div>
+                <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
+                  {diasEfectivos} dias · {emp.horas_por_dia || 8}h/dia · ${(emp.valor_hora || 0).toLocaleString("es-AR")}/h
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#4ade80" }}>{fmt(total)}</div>
+                <div style={{ fontSize: 11, color: "#475569" }}>a pagar</div>
+              </div>
+            </div>
+          );
+        })}
+        {empleados.filter(e => e.activo && e.valor_hora > 0).length === 0 && (
+          <div style={{ textAlign: "center", padding: 24, color: "#475569", fontSize: 13 }}>Configura el valor hora de los empleados arriba para ver los calculos.</div>
+        )}
+        {empleados.filter(e => e.activo && e.valor_hora > 0).length > 0 && (
+          <div style={{ background: "linear-gradient(135deg,rgba(74,222,128,0.08),rgba(16,185,129,0.04))", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontWeight: 700, color: "#4ade80", fontSize: 14 }}>Total a pagar</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "#4ade80" }}>
+              {fmt(empleados.filter(e => e.activo && e.valor_hora > 0).reduce((sum, emp) => {
+                const diasTrabajados = (emp.dias || DIAS.map(d => d.id)).length;
+                const diasEfectivos = Math.round(dias * diasTrabajados / 7);
+                return sum + (emp.valor_hora || 0) * (emp.horas_por_dia || 8) * diasEfectivos;
+              }, 0))}
+            </div>
           </div>
         )}
       </div>
@@ -1285,7 +1357,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const total = empBills.reduce((s, b) => s + (+(cajaForm[col.fk][b.id] || 0)), 0);
                     // En modo edicion la apertura siempre es editable
                     const isEditing = !!editCajaData;
-                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = false; // apertura siempre editable - auto fill es solo sugerencia return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="number" value={cajaForm[col.fk][b.id] || ""} placeholder="0" readOnly={isAuto} onChange={e => setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: e.target.value } })} style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
+                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = false; // apertura siempre editable - auto fill es solo sugerencia return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={isAuto} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: v } }); }} style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
@@ -2104,74 +2176,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 </div>
                 <div style={S.card}>
                   <div style={{ fontSize: 13, color: "#9f67ff", fontWeight: 700, marginBottom: 16 }}>🧮 Calcular liquidación</div>
-                  {(() => {
-                    const [liquidPeriodo, setLiquidPeriodo] = React.useState("mes");
-                    const [liquidDesde, setLiquidDesde] = React.useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
-                    const [liquidHasta, setLiquidHasta] = React.useState(todayStr);
-                    const periodos = [
-                      { id: "semana", label: "Esta semana", calcDias: () => { const h = new Date(); const ini = new Date(h); ini.setDate(h.getDate() - h.getDay() + 1); return Math.round((h - ini) / 86400000) + 1; } },
-                      { id: "quincena", label: "Quincena", calcDias: () => { const d = new Date().getDate(); return d <= 15 ? d : d - 15; } },
-                      { id: "mes", label: "Este mes", calcDias: () => new Date().getDate() },
-                      { id: "personalizado", label: "Personalizado", calcDias: () => Math.max(1, Math.round((new Date(liquidHasta) - new Date(liquidDesde)) / 86400000) + 1) },
-                    ];
-                    const periodoActual = periodos.find(p => p.id === liquidPeriodo);
-                    const dias = periodoActual?.calcDias() || 1;
-                    return (
-                      <div>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-                          {periodos.map(p => (
-                            <button key={p.id} onClick={() => setLiquidPeriodo(p.id)} style={S.subBtn(liquidPeriodo === p.id)}>{p.label}</button>
-                          ))}
-                        </div>
-                        {liquidPeriodo === "personalizado" && (
-                          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-                            <div style={{ flex: 1 }}><label style={S.label}>Desde</label><input type="date" value={liquidDesde} onChange={e => setLiquidDesde(e.target.value)} style={S.input} /></div>
-                            <div style={{ flex: 1 }}><label style={S.label}>Hasta</label><input type="date" value={liquidHasta} onChange={e => setLiquidHasta(e.target.value)} style={S.input} /></div>
-                          </div>
-                        )}
-                        <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 16, fontSize: 12, color: "#9f67ff" }}>
-                          📅 Calculando para <strong>{dias} día{dias !== 1 ? "s" : ""}</strong> · {periodoActual?.label}
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {empleados.filter(e => e.activo && e.valor_hora > 0).map(emp => {
-                            const diasTrabajados = (emp.dias || DIAS.map(d => d.id)).length;
-                            const proporcion = diasTrabajados / 7;
-                            const diasEfectivos = Math.round(dias * proporcion);
-                            const total = (emp.valor_hora || 0) * (emp.horas_por_dia || 8) * diasEfectivos;
-                            return (
-                              <div key={emp.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                                <div>
-                                  <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {emp.nombre}</div>
-                                  <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
-                                    {diasEfectivos} días · {emp.horas_por_dia || 8}h/día · ${(emp.valor_hora || 0).toLocaleString("es-AR")}/h
-                                  </div>
-                                </div>
-                                <div style={{ textAlign: "right" }}>
-                                  <div style={{ fontSize: 22, fontWeight: 800, color: "#4ade80" }}>{fmt(total)}</div>
-                                  <div style={{ fontSize: 11, color: "#475569" }}>a pagar</div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {empleados.filter(e => e.activo && e.valor_hora > 0).length === 0 && (
-                            <div style={{ textAlign: "center", padding: 24, color: "#475569", fontSize: 13 }}>Configurá el valor hora de los empleados arriba para ver los cálculos.</div>
-                          )}
-                          {empleados.filter(e => e.activo && e.valor_hora > 0).length > 0 && (
-                            <div style={{ background: "linear-gradient(135deg,rgba(74,222,128,0.08),rgba(16,185,129,0.04))", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <div style={{ fontWeight: 700, color: "#4ade80", fontSize: 14 }}>💰 Total a pagar</div>
-                              <div style={{ fontSize: 24, fontWeight: 800, color: "#4ade80" }}>
-                                {fmt(empleados.filter(e => e.activo && e.valor_hora > 0).reduce((sum, emp) => {
-                                  const diasTrabajados = (emp.dias || DIAS.map(d => d.id)).length;
-                                  const diasEfectivos = Math.round(dias * diasTrabajados / 7);
-                                  return sum + (emp.valor_hora || 0) * (emp.horas_por_dia || 8) * diasEfectivos;
-                                }, 0))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <LiquidacionCalc empleados={empleados} />
                 </div>
               </div>
             )}
