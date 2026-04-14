@@ -604,7 +604,7 @@ const EmployeeView = ({ session, onLogout }) => {
                             <div key={b.id} style={{ marginBottom: 10 }}>
                               <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
                               <input type="text" inputMode="numeric" value={form[col.key][b.id] ?? ""} placeholder="0" readOnly={isAuto}
-                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm({ ...form, [col.key]: { ...form[col.key], [b.id]: v } }); }}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm(prev => ({ ...prev, [col.key]: { ...prev[col.key], [b.id]: v } })); }}
                                 style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} />
                             </div>
                           );
@@ -1032,7 +1032,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
       }
     }
     await loadAll();
-    setImportPreview(null); showToast(`✅ ${importPreview.data.length} días importados`); setActiveTab("resumen");
+    const txCount = importPreview.transactions?.length || 0;
+    setImportPreview(null); showToast(`✅ ${importPreview.data.length} días importados · ${txCount} transacciones`); setActiveTab("resumen");
   };
 
   // ── Derived ──
@@ -1354,7 +1355,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const total = empBills.reduce((s, b) => s + (+(cajaForm[col.fk][b.id] || 0)), 0);
                     // En modo edicion la apertura siempre es editable
                     const isEditing = !!editCajaData;
-                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = false; // apertura siempre editable - auto fill es solo sugerencia return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={isAuto} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm({ ...cajaForm, [col.fk]: { ...cajaForm[col.fk], [b.id]: v } }); }} style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
+                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = false; // apertura siempre editable - auto fill es solo sugerencia return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={isAuto} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm(prev => ({ ...prev, [col.fk]: { ...prev[col.fk], [b.id]: v } })); }} style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
