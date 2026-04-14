@@ -405,8 +405,24 @@ const EmployeeView = ({ session, onLogout }) => {
   const destinos = config?.destinos_bajas || [];
   const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(form, bills);
   const de = entries.find(e => e.fecha === form.date);
-  // Comparamos el movimiento real de caja contra el neto del turno (filtrado por horario)
-  const pn = turnoTxs ? turnoTxs.neto : (de ? (de.cargas - de.retiros) : null);
+  // Comparamos el movimiento real de caja contra el neto del turno
+  // Si hay transacciones con hora, usamos el filtro exacto
+  // Si no, calculamos proporcionalmente por las horas del turno vs 24hs del dia
+  const pn = (() => {
+    if (turnoTxs) return turnoTxs.neto;
+    if (!de) return null;
+    const diaNetoTotal = de.cargas - de.retiros;
+    const diaKey2 = DIA_MAP[new Date(form.date + "T12:00:00").getDay()];
+    const hd2 = session.horarios_dia || session.horarios || {};
+    const hi = hd2[diaKey2 + "_ini"] || session.horario_inicio || "";
+    const hf = hd2[diaKey2 + "_fin"] || session.horario_fin || "";
+    if (!hi || !hf) return diaNetoTotal; // sin horario: muestra total
+    const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+    const ini = toMins(hi), fin = toMins(hf);
+    const duracion = fin > ini ? fin - ini : (1440 - ini + fin); // soporta turno nocturno
+    const prop = Math.min(duracion / 1440, 1);
+    return Math.round(diaNetoTotal * prop);
+  })();
   const dif = pn !== null ? mov - pn : null;
   const hasAlert = dif !== null && Math.abs(dif) > 100;
 
@@ -643,12 +659,23 @@ const EmployeeView = ({ session, onLogout }) => {
                         <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>📊 Lo que marcó la plataforma</div>
                         {turnoTxs?.horIni && (
                           <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>
-                            Filtrado por tu horario: {turnoTxs.horIni}{turnoTxs.horFin ? ` – ${turnoTxs.horFin}` : ""} · {turnoTxs.cant} transacciones
+                            ✅ Filtrado por tu horario: {turnoTxs.horIni}{turnoTxs.horFin ? ` – ${turnoTxs.horFin}` : ""} · {turnoTxs.cant} transacciones
                           </div>
                         )}
-                        {!turnoTxs?.horIni && de && (
-                          <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>Total del día (sin horario configurado)</div>
-                        )}
+                        {!turnoTxs && de && (() => {
+                          const diaKey2 = DIA_MAP[new Date(form.date + "T12:00:00").getDay()];
+                          const hd2 = session.horarios_dia || session.horarios || {};
+                          const hi = hd2[diaKey2 + "_ini"] || session.horario_inicio || "";
+                          const hf = hd2[diaKey2 + "_fin"] || session.horario_fin || "";
+                          if (hi && hf) {
+                            const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+                            const ini = toMins(hi), fin = toMins(hf);
+                            const dur = fin > ini ? fin - ini : (1440 - ini + fin);
+                            const pct = Math.round((dur / 1440) * 100);
+                            return <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>📊 Proporcional a tu turno ({hi} – {hf} · {pct}% del día)</div>;
+                          }
+                          return <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>Total del día (sin horario configurado)</div>;
+                        })()}
                         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                             <span style={{ color: "#94a3b8" }}>Cargas</span>
