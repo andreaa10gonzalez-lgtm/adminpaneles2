@@ -191,6 +191,7 @@ const db = {
   getJugadores: async (tid) => { const { data } = await supabase.from("jugadores").select("*").eq("tenant_id", tid); return data || []; },
   upsertJugadores: async (players) => supabase.from("jugadores").upsert(players, { onConflict: "tenant_id,nombre" }),
   getTransactions: async (tid, fecha) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).eq("fecha", fecha).order("hora"); return data || []; },
+  getAllTransactions: async (tid) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).order("hora"); return data || []; },
   upsertTransactions: async (txs) => supabase.from("panel_transactions").upsert(txs, { onConflict: "tenant_id,fecha,hora,jugador,tipo" }),
   getJugadorStats: async (tid, mes) => { const { data } = await supabase.from("jugador_stats").select("*").eq("tenant_id", tid).eq("mes", mes); return data || []; },
   upsertJugadorStats: async (stats) => supabase.from("jugador_stats").upsert(stats, { onConflict: "tenant_id,nombre,mes" }),
@@ -842,19 +843,28 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [notificaciones, setNotificaciones] = useState([]);
   const [showNotif, setShowNotif] = useState(false);
   const [turnoTxsCache, setTurnoTxsCache] = useState({});
+  const [allTxsByFecha, setAllTxsByFecha] = useState({});
   const fileRef = useRef();
   const showToast = m => { setToast(m); setTimeout(() => setToast(""), 2800); };
 
   const loadAll = async () => {
-    const [cfg, ents, jugs, camp, emps, cajs, notifs, stats] = await Promise.all([
+    const [cfg, ents, jugs, camp, emps, cajs, notifs, stats, allTxs] = await Promise.all([
       db.getConfig(tid), db.getEntries(tid), db.getJugadores(tid),
       db.getCampana(tid), db.getEmpleados(tid), db.getCajas(tid),
       db.getNotificaciones(tid), db.getJugadorStats(tid, cmk()),
+      db.getAllTransactions(tid),
     ]);
     setConfig(cfg || { nombre: session.nombre, billeteras: [], destinos_bajas: [] });
     setEntries(ents); setJugadores(jugs); setCampaign(camp); setEmpleados(emps); setCajas(cajs);
     setNotificaciones(notifs || []);
     setJugadorStats(stats || []);
+    // Group transactions by fecha for fast lookup
+    const byFecha = {};
+    (allTxs || []).forEach(t => {
+      if (!byFecha[t.fecha]) byFecha[t.fecha] = [];
+      byFecha[t.fecha].push(t);
+    });
+    setAllTxsByFecha(byFecha);
   };
 
   useEffect(() => { loadAll(); }, []);
@@ -1052,41 +1062,28 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const compareData = [{ name: "Cargas", Anterior: Math.round(pmCProp), Actual: cmC }, { name: "Retiros", Anterior: Math.round(pmRProp), Actual: cmR }, { name: "Neto", Anterior: Math.round(pmNProp), Actual: cmN }];
   const last7 = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); const ds = d.toISOString().slice(0, 10); const e = entries.find(x => x.fecha === ds); return { dia: d.toLocaleDateString("es-AR", { weekday: "short" }), Cargas: e?.cargas || 0, Retiros: e?.retiros || 0 }; }).reverse();
 
-  // Calcula el neto real del turno usando panel_transactions si existe, sino proporcional
+  // Calcula el neto real del turno filtrando panel_transactions por horario (sincrono)
   const calcPnTurno = (fecha, turnoLabel, de) => {
     if (!de) return null;
     const total = de.cargas - de.retiros;
-    const cacheKey = fecha + "|" + turnoLabel;
-    if (turnoTxsCache[cacheKey] !== undefined) return turnoTxsCache[cacheKey];
-    // Trigger async load
-    if (fecha && turnoLabel) {
-      const match = turnoLabel.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
-      if (match) {
-        db.getTransactions(tid, fecha).then(txs => {
-          const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
-          const ini = toMins(match[1]), fin = toMins(match[2]);
-          if (!txs || txs.length === 0) {
-            const dur = fin > ini ? fin - ini : (1440 - ini + fin);
-            setTurnoTxsCache(prev => ({ ...prev, [cacheKey]: Math.round(total * Math.min(dur / 1440, 1)) }));
-          } else {
-            const filtered = txs.filter(t => {
-              const h = toMins((t.hora || "00:00").slice(0, 5));
-              return fin > ini ? h >= ini && h <= fin : h >= ini || h <= fin;
-            });
-            const cargas = filtered.filter(t => t.tipo === "carga").reduce((s,t) => s + (+t.monto||0), 0);
-            const retiros = filtered.filter(t => t.tipo === "retiro").reduce((s,t) => s + (+t.monto||0), 0);
-            setTurnoTxsCache(prev => ({ ...prev, [cacheKey]: Math.round(cargas - retiros) }));
-          }
-        });
-      }
-    }
-    // While loading: return proportional estimate
-    const match = turnoLabel?.match(/(\d{1,2}:\d{2})\s*[–\-]\s*(\d{1,2}:\d{2})/);
-    if (!match) return total;
     const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+    const match = turnoLabel?.match(/(\d{1,2}:\d{2})\s*[\u2013\-]\s*(\d{1,2}:\d{2})/);
+    if (!match) return total;
     const ini = toMins(match[1]), fin = toMins(match[2]);
-    const dur = fin > ini ? fin - ini : (1440 - ini + fin);
-    return Math.round(total * Math.min(dur / 1440, 1));
+    const txs = allTxsByFecha[fecha];
+    if (!txs || txs.length === 0) {
+      // Sin transacciones: proporcional
+      const dur = fin > ini ? fin - ini : (1440 - ini + fin);
+      return Math.round(total * Math.min(dur / 1440, 1));
+    }
+    // Filtrar por horario del turno
+    const filtered = txs.filter(t => {
+      const h = toMins((t.hora || "00:00:00").slice(0, 5));
+      return fin > ini ? h >= ini && h <= fin : h >= ini || h <= fin;
+    });
+    const cargas = filtered.filter(t => t.tipo === "carga").reduce((s,t) => s + (+t.monto||0), 0);
+    const retiros = filtered.filter(t => t.tipo === "retiro").reduce((s,t) => s + (+t.monto||0), 0);
+    return Math.round(cargas - retiros);
   };
 
   const cajaHistorial = cajas.map(c => {
