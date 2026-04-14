@@ -787,11 +787,16 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
   useEffect(() => { loadAll(); }, []);
 
-  // Auto-fill apertura caja con el ultimo cierre registrado (cualquier empleado)
-  // NO ejecutar si estamos editando una caja existente
+  // Auto-fill apertura SOLO cuando cambia la fecha o el empleado (no en cada render)
+  // No sobreescribir si el dueño ya editó algo manualmente
+  const lastAutoFillRef = useRef({ date: null, empleado: null });
   useEffect(() => {
     if (!cajaForm.empleado) return;
-    if (editCajaData) return; // no pisar la apertura al editar
+    if (editCajaData) return;
+    // Solo auto-fill si cambió la fecha o el empleado (no si el usuario editó el inicio)
+    const key = cajaForm.date + "|" + cajaForm.empleado;
+    if (lastAutoFillRef.current.key === key) return;
+    lastAutoFillRef.current.key = key;
     const prev = cajas
       .filter(c => c.fecha < cajaForm.date && c.cierre && Object.keys(c.cierre).length > 0)
       .sort((a, b) => {
@@ -799,7 +804,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
         return fd !== 0 ? fd : (b.saved_at || "").localeCompare(a.saved_at || "");
       })[0];
     setCajaForm(f => ({ ...f, inicio: prev?.cierre ? { ...prev.cierre } : {} }));
-  }, [cajaForm.date, cajaForm.empleado, cajas]);
+  }, [cajaForm.date, cajaForm.empleado]);
 
   const bills = config?.billeteras || [];
   const destinos = config?.destinos_bajas || [];
@@ -1894,10 +1899,11 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       {empCajas.length === 0 ? <div style={{ color: "#475569", fontSize: 13, fontStyle: "italic" }}>Sin registros de caja todavía.</div> : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {empCajas.map(c => {
-                            const hasDif = Math.abs(c.dif || 0) > 100;
                             const de = entries.find(e => e.fecha === c.fecha);
-                            // Usar el turno_label de la caja para calcular el neto esperado
+                            // Usar datos reales de panel_transactions si existen, sino proporcional
                             const pn = calcPnTurno(c.fecha, c.turno_label, de);
+                            const difReal = pn !== null ? c.mov - pn : c.dif;
+                            const hasDif = Math.abs(difReal || 0) > 100;
                             return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "#1a0808" : "#0a0a14", border: `1px solid ${hasDif ? "#7f1d1d" : C.border}`, borderRadius: 12, padding: "13px 15px" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                                 <div>
@@ -1905,10 +1911,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                   <span style={{ fontSize: 11, color: "#475569", marginLeft: 10 }}>{c.turnoLabel}</span>
                                 </div>
                                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f87171" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#4ade80" : "#f87171" }, ...(pn !== null ? [{ label: "Esperado (panel)", v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: c.dif, col: hasDif ? "#f87171" : "#4ade80" }].map(x => (
+                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f87171" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#4ade80" : "#f87171" }, ...(pn !== null ? [{ label: "Esperado (panel)", v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: difReal, col: hasDif ? "#f87171" : "#4ade80" }].map(x => (
                                     <div key={x.label} style={{ textAlign: "right" }}>
                                       <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
-                                      <div style={{ color: x.col, fontWeight: 700, fontSize: 12 }}>{x.label === "Diferencia" && c.dif > 0 ? "+" : ""}{fmt(x.v)}</div>
+                                      <div style={{ color: x.col, fontWeight: 700, fontSize: 12 }}>{x.label === "Diferencia" && difReal > 0 ? "+" : ""}{fmt(x.v)}</div>
                                     </div>
                                   ))}
                                   <Badge ok={!hasDif} />
