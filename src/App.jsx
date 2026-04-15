@@ -806,6 +806,36 @@ const LiquidacionCalc = ({ empleados }) => {
   );
 };
 
+// ─── CAJA RESUMEN DUENO ──────────────────────────────────────────────────────
+const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, calcCaja }) => {
+  if (!bills.some(b => cajaForm.cierre[b.id])) return null;
+  const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(cajaForm, bills);
+  const de = entries.find(e => e.fecha === cajaForm.date);
+  const diaE = DIA_MAP[new Date(cajaForm.date + "T12:00:00").getDay()];
+  const empE = empleados.find(e => e.nombre === cajaForm.empleado);
+  const hdE = empE?.horarios_dia || {};
+  const hiE = hdE[diaE + "_ini"] || empE?.horario_inicio || "";
+  const hfE = hdE[diaE + "_fin"] || empE?.horario_fin || "";
+  const turnoLabelE = hiE && hfE ? hiE + " – " + hfE : null;
+  const pn = calcPnTurno(cajaForm.date, turnoLabelE, de);
+  const dif = pn !== null ? mov - pn : null;
+  const al = dif !== null && Math.abs(dif) > 100;
+  return (
+    <div style={{ background: al ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (al ? "#7f1d1d" : "#14532d"), borderRadius: 14, padding: "14px 18px" }}>
+      <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <div><div style={{ fontSize: 10, color: "#475569" }}>Mov.</div><div style={{ fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>
+        {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}
+        {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}
+        <div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>
+        {pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado</div><div style={{ fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}
+        {dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontSize: 18, fontWeight: 800, color: al ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}
+      </div>
+      {al && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>Diferencia significativa</div>}
+    </div>
+  );
+};
+
 // ─── OWNER DASHBOARD ─────────────────────────────────────────────────────────
 const OwnerDashboard = ({ session, onLogout }) => {
   const tid = session.tenantId;
@@ -1358,21 +1388,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
-                  {bills.some(b => cajaForm.cierre[b.id]) && (() => {
-                    const { tI, tC, totalBajas, totalBonos, mov } = calcCaja(cajaForm, bills);
-                    const de = entries.find(e => e.fecha === cajaForm.date);
-                    // Comparamos mov real de caja vs neto proporcional al horario
-                    const diaE = DIA_MAP[new Date(cajaForm.date + 'T12:00:00').getDay()];
-                    const empE = empleados.find(e => e.nombre === cajaForm.empleado);
-                    const hdE = empE?.horarios_dia || {};
-                    const hiE = hdE[diaE + '_ini'] || empE?.horario_inicio || '';
-                    const hfE = hdE[diaE + '_fin'] || empE?.horario_fin || '';
-                    const turnoLabelE = hiE && hfE ? hiE + ' – ' + hfE : null;
-                    const pn = calcPnTurno(cajaForm.date, turnoLabelE, de);
-                    const dif = pn !== null ? mov - pn : null;
-                    const al = dif !== null && Math.abs(dif) > 100;
-                    return (<div style={{ background: al ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (al ? "#7f1d1d" : "#14532d"), borderRadius: 14, padding: "14px 18px" }}><div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div><div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}><div><div style={{ fontSize: 10, color: "#475569" }}>Mov.</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>{totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}{totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}<div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>{pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}{dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: al ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}</div>{al && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>⚠️ Diferencia significativa</div>}</div>);
-                  })()}
+                  <CajaResumenDueno cajaForm={cajaForm} bills={bills} entries={entries} empleados={empleados} calcPnTurno={calcPnTurno} calcCaja={calcCaja} />
                   <button onClick={saveCaja} style={{ ...S.btn, width: "100%" }}>📋 Guardar cierre de turno</button>
                 </div>
               </div>
