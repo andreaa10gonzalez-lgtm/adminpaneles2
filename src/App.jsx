@@ -963,14 +963,9 @@ const ExtensionSettings = ({ tid, supabase }) => {
   const [copied, setCopied] = useState(false);
 
   // Generate connection code: base64(tenantId|supabaseUrl|supabaseKey)
-  const generateCode = () => {
-    const url = supabase.supabaseUrl || "";
-    const key = supabase.supabaseKey || "";
-    if (!url || !key) return "";
-    try { return btoa(`${tid}|${url}|${key}`); } catch { return ""; }
-  };
-
-  const code = generateCode();
+  const SUPA_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
+  const SUPA_KEY = "sb_publishable_E64BlBT1wwUPfyrX0uxGyQ_oj_ItBCw";
+  const code = (() => { try { return btoa(`${tid}|${SUPA_URL}|${SUPA_KEY}`); } catch { return ""; } })();
 
   const copy = () => {
     if (!code) return;
