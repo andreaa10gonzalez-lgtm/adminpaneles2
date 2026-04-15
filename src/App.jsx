@@ -958,6 +958,298 @@ const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, ca
   );
 };
 
+// ─── EXTENSION SETTINGS ──────────────────────────────────────────────────────
+const ExtensionSettings = ({ tid, supabase }) => {
+  const [copied, setCopied] = useState(false);
+
+  // Generate connection code: base64(tenantId|supabaseUrl|supabaseKey)
+  const generateCode = () => {
+    const url = supabase.supabaseUrl || "";
+    const key = supabase.supabaseKey || "";
+    if (!url || !key) return "";
+    try { return btoa(`${tid}|${url}|${key}`); } catch { return ""; }
+  };
+
+  const code = generateCode();
+
+  const copy = () => {
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div style={{ maxWidth: 520 }}>
+      <div style={S.card}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🔌</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#f1f5f9" }}>Extensión de Chrome / Edge</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Conecta tu extensión con este panel</div>
+          </div>
+        </div>
+
+        <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 10 }}>Pasos para conectar</div>
+          {[
+            "Instalá la extensión en Chrome o Edge",
+            "Hacé click en el ícono 🎰 en la barra del browser",
+            "Copiá el código de abajo y pegalo en la extensión",
+            "Hacé click en Conectar — listo",
+          ].map((step, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{i + 1}</div>
+              <div style={{ fontSize: 12, color: "#e2e8f0", lineHeight: 1.5 }}>{step}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <label style={S.label}>Tu código de conexión</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input readOnly value={code || "Configurando..."} style={{ ...S.input, fontFamily: "monospace", fontSize: 11, color: "#a78bfa", flex: 1 }} />
+            <button onClick={copy} style={{ ...S.btn, padding: "11px 16px", whiteSpace: "nowrap", background: copied ? "linear-gradient(135deg,#10b981,#059669)" : undefined }}>
+              {copied ? "✓ Copiado" : "Copiar"}
+            </button>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "#64748b" }}>⚠ No compartas este código. Cualquiera que lo tenga puede conectarse a tu panel.</div>
+      </div>
+
+      <div style={{ ...S.card, marginTop: 14 }}>
+        <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 12 }}>¿Qué hace la extensión?</div>
+        {[
+          ["📱 WhatsApp Web", "Lee mensajes de clientes, mide tiempos de respuesta y detecta pedidos de carga/retiro"],
+          ["💬 CRM / Chat", "Se adapta a cualquier plataforma de atención y extrae datos automáticamente"],
+          ["🎰 Plataforma casino", "Lee transacciones directamente sin necesidad de exportar CSV"],
+          ["👥 Jugadores", "Construye automáticamente perfiles de tus jugadores más activos"],
+        ].map(([icon, desc]) => (
+          <div key={icon} style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid rgba(124,58,237,0.1)" }}>
+            <div style={{ fontSize: 18, width: 28, textAlign: "center" }}>{icon}</div>
+            <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>{desc}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── COMMS MENSAJES ───────────────────────────────────────────────────────────
+const CommsMensajes = ({ tid, supabase, fmt }) => {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+
+  useEffect(() => {
+    supabase.from("ext_messages")
+      .select("*")
+      .eq("tenant_id", tid)
+      .order("timestamp", { ascending: false })
+      .limit(100)
+      .then(({ data }) => { setMessages(data || []); setLoading(false); });
+  }, []);
+
+  const filtered = filter === "all" ? messages : messages.filter(m => m.detected_action === filter);
+
+  const avgResponse = messages.filter(m => m.response_time_seconds > 0).length > 0
+    ? Math.round(messages.filter(m => m.response_time_seconds > 0).reduce((s, m) => s + m.response_time_seconds, 0) / messages.filter(m => m.response_time_seconds > 0).length)
+    : null;
+
+  const formatTime = (secs) => {
+    if (!secs) return "—";
+    if (secs < 60) return `${secs}s`;
+    if (secs < 3600) return `${Math.floor(secs/60)}m ${secs%60}s`;
+    return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`;
+  };
+
+  const actionColor = (a) => a === "carga" ? "#10b981" : a === "retiro" ? "#f43f5e" : a === "consulta" ? "#f59e0b" : "#64748b";
+  const sourceIcon = (s) => s === "whatsapp" ? "📱" : s === "crm" ? "💬" : s === "platform" ? "🎰" : "🌐";
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>Cargando mensajes...</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>💬 Mensajes</h2>
+        <div style={{ display: "flex", gap: 6 }}>
+          {["all", "carga", "retiro", "consulta"].map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{ ...S.subBtn(filter === f), fontSize: 11, padding: "6px 12px" }}>
+              {f === "all" ? "Todos" : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "Total mensajes", value: messages.length, color: "#a78bfa" },
+          { label: "Cargas detectadas", value: messages.filter(m => m.detected_action === "carga").length, color: "#10b981" },
+          { label: "Retiros detectados", value: messages.filter(m => m.detected_action === "retiro").length, color: "#f43f5e" },
+          { label: "Tiempo resp. prom.", value: avgResponse ? formatTime(avgResponse) : "—", color: "#f59e0b" },
+        ].map(k => (
+          <div key={k.label} style={S.card}>
+            <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "'Space Grotesk',sans-serif" }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {messages.length === 0 ? (
+        <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📡</div>
+          <div style={{ color: "#64748b", fontSize: 13 }}>No hay mensajes todavía. Instalá la extensión y abrí WhatsApp Web o tu CRM.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {filtered.map(m => (
+            <div key={m.id} style={{ ...S.card, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 14 }}>{sourceIcon(m.source)}</span>
+                  <span style={{ fontWeight: 600, fontSize: 12, color: "#e2e8f0" }}>{m.sender_name || "Desconocido"}</span>
+                  {m.sender_phone && <span style={{ fontSize: 10, color: "#64748b" }}>{m.sender_phone}</span>}
+                  <span style={{ fontSize: 10, color: m.message_type === "incoming" ? "#38bdf8" : "#64748b", background: m.message_type === "incoming" ? "rgba(56,189,248,0.1)" : "rgba(100,116,139,0.1)", padding: "1px 6px", borderRadius: 10 }}>
+                    {m.message_type === "incoming" ? "Cliente" : "Empleado"}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>{m.message_text?.slice(0, 120)}{m.message_text?.length > 120 ? "..." : ""}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                {m.detected_action && (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: actionColor(m.detected_action), background: actionColor(m.detected_action) + "15", padding: "2px 8px", borderRadius: 10 }}>
+                    {m.detected_action.toUpperCase()}{m.detected_amount ? ` $${m.detected_amount.toLocaleString("es-AR")}` : ""}
+                  </span>
+                )}
+                {m.response_time_seconds > 0 && (
+                  <span style={{ fontSize: 10, color: m.response_time_seconds > 300 ? "#f43f5e" : "#10b981", background: m.response_time_seconds > 300 ? "rgba(244,63,94,0.1)" : "rgba(16,185,129,0.1)", padding: "2px 8px", borderRadius: 10 }}>
+                    ⏱ {formatTime(m.response_time_seconds)}
+                  </span>
+                )}
+                <span style={{ fontSize: 10, color: "#475569" }}>
+                  {m.timestamp ? new Date(m.timestamp).toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── COMMS JUGADORES ──────────────────────────────────────────────────────────
+const CommsJugadores = ({ tid, supabase, fmt }) => {
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState("total_cargas");
+
+  useEffect(() => {
+    supabase.from("ext_players")
+      .select("*")
+      .eq("tenant_id", tid)
+      .order(sort, { ascending: false })
+      .limit(100)
+      .then(({ data }) => { setPlayers(data || []); setLoading(false); });
+  }, [sort]);
+
+  const formatTime = (secs) => {
+    if (!secs) return "—";
+    if (secs < 60) return `${secs}s`;
+    if (secs < 3600) return `${Math.floor(secs/60)}m`;
+    return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`;
+  };
+
+  const responseColor = (secs) => {
+    if (!secs) return "#64748b";
+    if (secs < 60) return "#10b981";
+    if (secs < 300) return "#f59e0b";
+    return "#f43f5e";
+  };
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>Cargando jugadores...</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>👥 Jugadores detectados</h2>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: "#64748b" }}>Ordenar por:</span>
+          {[
+            { id: "total_cargas", label: "Cargas" },
+            { id: "total_retiros", label: "Retiros" },
+            { id: "cant_cargas", label: "Frecuencia" },
+            { id: "avg_response_time_seconds", label: "Resp. más rápida" },
+            { id: "last_seen", label: "Último visto" },
+          ].map(s => (
+            <button key={s.id} onClick={() => setSort(s.id)} style={{ ...S.subBtn(sort === s.id), fontSize: 11, padding: "5px 10px" }}>{s.label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "Jugadores detectados", value: players.length, color: "#a78bfa" },
+          { label: "Total cargas", value: fmt(players.reduce((s, p) => s + (p.total_cargas || 0), 0)), color: "#10b981" },
+          { label: "Total retiros", value: fmt(players.reduce((s, p) => s + (p.total_retiros || 0), 0)), color: "#f43f5e" },
+        ].map(k => (
+          <div key={k.label} style={S.card}>
+            <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: k.color, fontFamily: "'Space Grotesk',sans-serif" }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {players.length === 0 ? (
+        <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>👥</div>
+          <div style={{ color: "#64748b", fontSize: 13 }}>No hay jugadores detectados todavía. La extensión los va construyendo automáticamente.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {players.map((p, i) => (
+            <div key={p.id} style={{ ...S.card, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: i < 3 ? "linear-gradient(135deg,#7c3aed,#4f46e5)" : "rgba(124,58,237,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff" }}>
+                  {i < 3 ? ["🥇","🥈","🥉"][i] : `#${i+1}`}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>{p.name || p.identifier}</div>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+                    {p.phone && <span style={{ marginRight: 8 }}>📱 {p.phone}</span>}
+                    <span>{p.source === "whatsapp" ? "📱 WhatsApp" : p.source === "crm" ? "💬 CRM" : "🎰 Plataforma"}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>Cargas</div>
+                  <div style={{ color: "#10b981", fontWeight: 700 }}>{fmt(p.total_cargas || 0)}</div>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>{p.cant_cargas || 0} veces</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>Retiros</div>
+                  <div style={{ color: "#f43f5e", fontWeight: 700 }}>{fmt(p.total_retiros || 0)}</div>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>{p.cant_retiros || 0} veces</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>Resp. prom.</div>
+                  <div style={{ color: responseColor(p.avg_response_time_seconds), fontWeight: 700 }}>{formatTime(p.avg_response_time_seconds)}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>Último visto</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{p.last_seen ? new Date(p.last_seen).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "—"}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── OWNER DASHBOARD ─────────────────────────────────────────────────────────
 const OwnerDashboard = ({ session, onLogout }) => {
   const tid = session.tenantId;
@@ -1292,6 +1584,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
     { id: "gestion",     label: "Gestión",     icon: "◇", items: [
       { id: "empleados_hist", label: "Empleados", desc: "Historial por empleado" },
       { id: "ajustes",        label: "Ajustes",   desc: "Configuración del panel" },
+    ]},
+    { id: "comms",        label: "Comunicaciones", icon: "◐", items: [
+      { id: "comms_mensajes",  label: "Mensajes",   desc: "Mensajes y tiempos de respuesta" },
+      { id: "comms_jugadores", label: "Jugadores",  desc: "Base de jugadores detectados" },
     ]},
   ];
   const activeGroup = NAV_GROUPS.find(g => g.items.some(i => i.id === activeTab));
@@ -2140,7 +2436,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
           <div>
             <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#c4b5fd" }}>⚙️ Ajustes</h2>
             <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-              {[{ id: "billeteras", label: "💳 Billeteras" }, { id: "empleados", label: "👥 Empleados" }, { id: "sueldos", label: "💵 Sueldos" }, { id: "bajas", label: "📤 Destinos Bajas" }, { id: "negocio", label: "🏷️ Negocio" }].map(t => (<button key={t.id} onClick={() => setSettingsTab(t.id)} style={S.subBtn(settingsTab === t.id)}>{t.label}</button>))}
+              {[{ id: "billeteras", label: "💳 Billeteras" }, { id: "empleados", label: "👥 Empleados" }, { id: "sueldos", label: "💵 Sueldos" }, { id: "bajas", label: "📤 Destinos Bajas" }, { id: "negocio", label: "🏷️ Negocio" }, { id: "extension", label: "🔌 Extensión" }].map(t => (<button key={t.id} onClick={() => setSettingsTab(t.id)} style={S.subBtn(settingsTab === t.id)}>{t.label}</button>))}
             </div>
 
             {settingsTab === "billeteras" && (
@@ -2323,8 +2619,21 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 </div>
               </div>
             )}
+
+            {settingsTab === "extension" && (
+              <ExtensionSettings tid={tid} supabase={supabase} />
+            )}
           </div>
         )}
+
+        {activeTab === "comms_mensajes" && (
+          <CommsMensajes tid={tid} supabase={supabase} fmt={fmt} />
+        )}
+
+        {activeTab === "comms_jugadores" && (
+          <CommsJugadores tid={tid} supabase={supabase} fmt={fmt} />
+        )}
+
       </div>
     </div>
   );
