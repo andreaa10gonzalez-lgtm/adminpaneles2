@@ -129,7 +129,7 @@ const parseCSV = (text, existingPFS = {}) => {
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 const S = {
   page: { minHeight: "100vh", background: "radial-gradient(ellipse 120% 80% at 50% -10%, rgba(124,58,237,0.08) 0%, #080612 50%)", color: "#f1f5f9", fontFamily: "'Space Grotesk', 'DM Sans', 'Inter', sans-serif" },
-  card: { background: "rgba(15,13,31,0.8)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: 16, padding: "20px 22px", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", boxShadow: "0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)" },
+  card: { background: "rgba(15,13,31,0.8)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: 16, padding: "20px 22px", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", boxShadow: "0 4px 24px rgba(0,0,0,0.4)" },
   input: { width: "100%", background: "rgba(8,6,18,0.8)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "11px 14px", color: "#f1f5f9", fontSize: 14, outline: "none", boxSizing: "border-box", transition: "border-color 150ms ease" },
   btn: { background: "linear-gradient(135deg,#7c3aed 0%,#6d28d9 50%,#4f46e5 100%)", border: "none", color: "#fff", padding: "12px 22px", borderRadius: 10, cursor: "pointer", fontSize: 14, fontWeight: 600, boxShadow: "0 4px 20px rgba(124,58,237,0.4), 0 1px 0 rgba(255,255,255,0.1) inset", letterSpacing: "0.01em", transition: "all 150ms ease" },
   ghost: { background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.25)", color: "#a78bfa", padding: "9px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 500, transition: "all 150ms ease" },
@@ -493,7 +493,7 @@ const EmployeeView = ({ session, onLogout }) => {
                     <button onClick={() => del(item.id)} style={{ ...S.danger, alignSelf: "flex-end" }}>🗑️</button>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <div><label style={S.label}>Monto ($)</label><input type="number" value={item.monto} placeholder="0" onChange={e => upd(item.id, "monto", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
+                    <div><label style={S.label}>Monto ($)</label><input type="text" inputMode="numeric" value={item.monto} placeholder="0" onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); upd(item.id, "monto", v); }} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                     <div><label style={S.label}>Nota</label><input type="text" value={item.nota || ""} onChange={e => upd(item.id, "nota", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   </div>
                   {dest && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>🏦 {dest.titular} · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{dest.cbu}</span></div>}
@@ -525,7 +525,7 @@ const EmployeeView = ({ session, onLogout }) => {
               <div key={item.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid #4c1d95", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <div><label style={S.label}>Jugador</label><input type="text" value={item.jugador} onChange={e => upd(item.id, "jugador", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
-                  <div><label style={S.label}>Monto ($)</label><input type="number" value={item.monto} placeholder="0" onChange={e => upd(item.id, "monto", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
+                  <div><label style={S.label}>Monto ($)</label><input type="text" inputMode="numeric" value={item.monto} placeholder="0" onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); upd(item.id, "monto", v); }} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   <div><label style={S.label}>Nota</label><input type="text" value={item.nota || ""} onChange={e => upd(item.id, "nota", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   <button onClick={() => del(item.id)} style={{ ...S.danger, alignSelf: "flex-end" }}>🗑️</button>
                 </div>
@@ -1265,7 +1265,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <div><label style={S.label}>Billetera</label><select value={item.billeteraId} onChange={e => upd(item.id, "billeteraId", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px", appearance: "none" }}><option value="">—</option>{bills.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
                   <div><label style={S.label}>Destino</label><select value={item.destinoId} onChange={e => upd(item.id, "destinoId", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px", appearance: "none" }}><option value="">—</option>{destinos.map(d => <option key={d.id} value={d.id}>{d.alias}</option>)}</select></div>
-                  <div><label style={S.label}>Monto ($)</label><input type="number" value={item.monto} placeholder="0" onChange={e => upd(item.id, "monto", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
+                  <div><label style={S.label}>Monto ($)</label><input type="text" inputMode="numeric" value={item.monto} placeholder="0" onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); upd(item.id, "monto", v); }} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   <button onClick={() => del(item.id)} style={{ ...S.danger, alignSelf: "flex-end" }}>🗑️</button>
                 </div>
                 <div style={{ marginTop: 8 }}><input type="text" value={item.nota || ""} placeholder="Nota..." onChange={e => upd(item.id, "nota", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "7px 10px" }} /></div>
@@ -1297,7 +1297,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
               <div key={item.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid #4c1d95", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <div><label style={S.label}>Jugador</label><input type="text" value={item.jugador} onChange={e => upd(item.id, "jugador", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
-                  <div><label style={S.label}>Monto ($)</label><input type="number" value={item.monto} placeholder="0" onChange={e => upd(item.id, "monto", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
+                  <div><label style={S.label}>Monto ($)</label><input type="text" inputMode="numeric" value={item.monto} placeholder="0" onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); upd(item.id, "monto", v); }} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   <div><label style={S.label}>Nota</label><input type="text" value={item.nota || ""} onChange={e => upd(item.id, "nota", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   <button onClick={() => del(item.id)} style={{ ...S.danger, alignSelf: "flex-end" }}>🗑️</button>
                 </div>
