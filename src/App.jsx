@@ -1980,7 +1980,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                   <span style={{ fontSize: 11, color: "#475569", marginLeft: 10 }}>{c.turnoLabel}</span>
                                 </div>
                                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f87171" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#4ade80" : "#f87171" }, ...(pn !== null ? [{ label: `Esperado (${(allTxsByFecha[c.fecha] || []).length > 0 ? (allTxsByFecha[c.fecha] || []).length + " txs" : "proporcional"})`, v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: difReal, col: hasDif ? "#f87171" : "#4ade80" }].map(x => (
+                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f87171" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#4ade80" : "#f87171" }, ...(pn !== null ? [{ label: "Esperado (panel)", v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: difReal, col: hasDif ? "#f87171" : "#4ade80" }].map(x => (
                                     <div key={x.label} style={{ textAlign: "right" }}>
                                       <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
                                       <div style={{ color: x.col, fontWeight: 700, fontSize: 12 }}>{x.label === "Diferencia" && difReal > 0 ? "+" : ""}{fmt(x.v)}</div>
