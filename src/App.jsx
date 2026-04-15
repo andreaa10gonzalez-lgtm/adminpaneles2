@@ -619,7 +619,7 @@ const EmployeeView = ({ session, onLogout }) => {
                           const isAuto = col.ro && !!form.inicio[b.id] && !editingApertura;
                           return (
                             <div key={b.id} style={{ marginBottom: 10 }}>
-                              <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
+                              <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{isAuto && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
                               <input type="text" inputMode="numeric" value={form[col.key][b.id] ?? ""} placeholder="0" readOnly={isAuto}
                                 onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm(prev => ({ ...prev, [col.key]: { ...prev[col.key], [b.id]: v } })); }}
                                 style={{ ...S.input, background: "rgba(8,6,18,0.8)", color: "#f1f5f9" }} />
