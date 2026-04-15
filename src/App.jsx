@@ -1354,7 +1354,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const total = empBills.reduce((s, b) => s + (+(cajaForm[col.fk][b.id] || 0)), 0);
                     // En modo edicion la apertura siempre es editable
                     const isEditing = !!editCajaData;
-                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = false; // apertura siempre editable - auto fill es solo sugerencia return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={isAuto} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm(prev => ({ ...prev, [col.fk]: { ...prev[col.fk], [b.id]: v } })); }} style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
+                    return (<div key={col.fk} style={S.card}><div style={{ fontSize: 12, color: col.color, fontWeight: 700, marginBottom: 12 }}>{col.label}</div><div style={{ display: "grid", gridTemplateColumns: empBills.length > 3 ? "1fr 1fr" : "1fr", gap: "0 16px" }}>{empBills.map(b => { const isAuto = false; // apertura siempre editable - auto fill es solo sugerencia return (<div key={b.id} style={{ marginBottom: 10 }}><label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label><input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={isAuto} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm(prev => ({ ...prev, [col.fk]: { ...prev[col.fk], [b.id]: v } })); }} style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} /></div>); })}</div><div style={{ borderTop: "1px solid #1e1e38", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span></div></div>);
                   })}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
                   <CajaBonos formState={cajaForm} setFormState={setCajaForm} />
@@ -1387,7 +1387,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       const hasDif = Math.abs(c.dif) > 100;
                       const commentKey = c.fecha + c.turno_id;
                       return (
-                        <div key={commentKey} style={{ background: hasDif ? "#1a0808" : C.card, border: `1px solid ${hasDif ? "#7f1d1d" : C.border}`, borderRadius: 14 }}>
+                        <div key={commentKey} style={{ background: hasDif ? "#1a0808" : C.card, border: "1px solid " + (hasDif ? "#7f1d1d" : C.border), borderRadius: 14 }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", flexWrap: "wrap", gap: 8 }}>
                             <div onClick={() => setExpandedCaja(isExp ? null : commentKey)} style={{ cursor: "pointer", flex: 1 }}>
                               <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
@@ -1973,7 +1973,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                             const pn = calcPnTurno(c.fecha, c.turno_label, de);
                             const difReal = pn !== null ? c.mov - pn : c.dif;
                             const hasDif = Math.abs(difReal || 0) > 100;
-                            return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "#1a0808" : "#0a0a14", border: `1px solid ${hasDif ? "#7f1d1d" : C.border}`, borderRadius: 12, padding: "13px 15px" }}>
+                            return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "#1a0808" : "#0a0a14", border: "1px solid " + (hasDif ? "#7f1d1d" : C.border), borderRadius: 12, padding: "13px 15px" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                                 <div>
                                   <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
@@ -2035,7 +2035,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                         const horFin = (newEmpForm.horarios_dia || {})[d.id + "_fin"] || "";
                         return (
                           <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <button onClick={() => { const dias = newEmpForm.dias || []; setNewEmpForm({ ...newEmpForm, dias: dias.includes(d.id) ? dias.filter(x => x !== d.id) : [...dias, d.id] }); }} style={{ width: 52, padding: "7px 0", border: `1px solid ${on ? "#7c3aed" : C.border}`, borderRadius: 8, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#475569", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
+                            <button onClick={() => { const dias = newEmpForm.dias || []; setNewEmpForm({ ...newEmpForm, dias: dias.includes(d.id) ? dias.filter(x => x !== d.id) : [...dias, d.id] }); }} style={{ width: 52, padding: "7px 0", border: "1px solid " + (on ? "#7c3aed" : C.border), borderRadius: 8, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#475569", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
                             {on ? (
                               <div style={{ display: "flex", gap: 8, flex: 1, alignItems: "center" }}>
                                 <input type="time" value={horIni} placeholder="Desde" onChange={e => setNewEmpForm({ ...newEmpForm, horarios_dia: { ...(newEmpForm.horarios_dia || {}), [d.id + "_ini"]: e.target.value } })} style={{ ...S.input, fontSize: 12, flex: 1 }} />
