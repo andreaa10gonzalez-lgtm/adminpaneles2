@@ -129,7 +129,7 @@ const Trend = ({ value, invert = false }) => {
 };
 
 const StatCard = ({ icon, label, value, sub, color = "#a78bfa", trend, onClick }) => (
-  <div onClick={onClick} style={{ ...S.card, cursor: onClick ? "pointer" : "default", borderColor: `${color}25`, background: `linear-gradient(135deg,${color}0a,#0e0e1a)` }}>
+  <div onClick={onClick} style={{ ...S.card, cursor: onClick ? "pointer" : "default", borderColor: color + "25", background: `linear-gradient(135deg,${color}0a,#0e0e1a)` }}>
     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
       <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600 }}>{label}</div>
       <span style={{ fontSize: 20 }}>{icon}</span>
@@ -141,13 +141,13 @@ const StatCard = ({ icon, label, value, sub, color = "#a78bfa", trend, onClick }
 );
 
 const Badge = ({ ok }) => (
-  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: ok ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", color: ok ? "#4ade80" : "#f87171", border: `1px solid ${ok ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
+  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: ok ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", color: ok ? "#4ade80" : "#f87171", border: "1px solid " + (ok ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"), borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
     <span style={{ width: 5, height: 5, borderRadius: "50%", background: ok ? "#4ade80" : "#f87171" }} />{ok ? "OK" : "Alerta"}
   </span>
 );
 
 const Tag = ({ color = "#a78bfa", children }) => (
-  <span style={{ background: `${color}18`, color, border: `1px solid ${color}30`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{children}</span>
+  <span style={{ background: color + "18", color, border: "1px solid " + color + "30", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>{children}</span>
 );
 
 // ─── DB HELPERS ──────────────────────────────────────────────────────────────
@@ -593,7 +593,7 @@ const EmployeeView = ({ session, onLogout }) => {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                           <div style={{ fontSize: 12, color: col.color, fontWeight: 700 }}>{col.label}</div>
                           {col.key === "inicio" && (
-                            <button onClick={() => setEditApertura(!editApertura)} style={{ background: editApertura ? "#2d1b69" : "transparent", border: `1px solid ${editApertura ? "#7c3aed" : "#2a1f4a"}`, color: editApertura ? "#c084fc" : "#475569", padding: "3px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>
+                            <button onClick={() => setEditApertura(!editApertura)} style={{ background: editApertura ? "#2d1b69" : "transparent", border: "1px solid " + (editApertura ? "#7c3aed" : "#2a1f4a"), color: editApertura ? "#c084fc" : "#475569", padding: "3px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>
                               {editApertura ? "✓ Listo" : "✏️ Corregir"}
                             </button>
                           )}
@@ -624,7 +624,7 @@ const EmployeeView = ({ session, onLogout }) => {
                 <BajasForm />
                 <BonosForm />
                 {bills.some(b => form.cierre[b.id]) && (
-                  <div style={{ background: "#0a0a14", border: `1px solid ${hasAlert ? "#7f1d1d" : "#1e1e38"}`, borderRadius: 14, padding: "18px 20px", marginBottom: 14 }}>
+                  <div style={{ background: "#0a0a14", border: "1px solid " + (hasAlert ? "#7f1d1d" : "#1e1e38"), borderRadius: 14, padding: "18px 20px", marginBottom: 14 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#9f67ff", marginBottom: 16 }}>📋 Resumen del turno</div>
 
                     {/* BLOQUE 1: Lo que dio la caja */}
@@ -1272,7 +1272,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
               <div><h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#c084fc" }}>📅 Resumen del Día</h2></div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                {[...new Set([...cajas.map(c => c.fecha), ...entries.map(e => e.fecha)])].sort((a, b) => b.localeCompare(a)).slice(0, 5).map(d => (<button key={d} onClick={() => setSelectedDay(d)} style={{ padding: "7px 12px", border: `1px solid ${selectedDay === d ? "#7c3aed" : "#2a1f4a"}`, borderRadius: 8, background: selectedDay === d ? "#2d1b69" : "#0a0a0f", color: selectedDay === d ? "#c084fc" : "#7c6fa0", cursor: "pointer", fontSize: 11, fontWeight: selectedDay === d ? 700 : 400 }}>{new Date(d + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</button>))}
+                {[...new Set([...cajas.map(c => c.fecha), ...entries.map(e => e.fecha)])].sort((a, b) => b.localeCompare(a)).slice(0, 5).map(d => (<button key={d} onClick={() => setSelectedDay(d)} style={{ padding: "7px 12px", border: "1px solid " + (selectedDay === d ? "#7c3aed" : "#2a1f4a"), borderRadius: 8, background: selectedDay === d ? "#2d1b69" : "#0a0a0f", color: selectedDay === d ? "#c084fc" : "#7c6fa0", cursor: "pointer", fontSize: 11, fontWeight: selectedDay === d ? 700 : 400 }}>{new Date(d + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</button>))}
                 <input type="date" value={selectedDay} onChange={e => setSelectedDay(e.target.value)} style={{ ...S.input, width: "auto", padding: "7px 12px", fontSize: 12 }} />
               </div>
             </div>
@@ -1305,7 +1305,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   ))}
                 </div>
                 {day.dayTurnos.some(t => t.exists) && (
-                  <div style={{ ...S.card, marginTop: 16, background: alertDay ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: `1px solid ${alertDay ? "#7f1d1d" : "#14532d"}` }}>
+                  <div style={{ ...S.card, marginTop: 16, background: alertDay ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (alertDay ? "#7f1d1d" : "#14532d") }}>
                     <div style={{ fontSize: 12, color: alertDay ? "#f87171" : "#4ade80", fontWeight: 600, marginBottom: 12 }}>Totales del día</div>
                     <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
                       {day.panelNeto !== null && <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Panel neto</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: "#a78bfa" }}>{fmt(day.panelNeto)}</div></div>}
@@ -1371,7 +1371,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const pn = calcPnTurno(cajaForm.date, turnoLabelE, de);
                     const dif = pn !== null ? mov - pn : null;
                     const al = dif !== null && Math.abs(dif) > 100;
-                    return (<div style={{ background: al ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: `1px solid ${al ? "#7f1d1d" : "#14532d"}`, borderRadius: 14, padding: "14px 18px" }}><div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div><div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}><div><div style={{ fontSize: 10, color: "#475569" }}>Mov.</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>{totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}{totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}<div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>{pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}{dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: al ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}</div>{al && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>⚠️ Diferencia significativa</div>}</div>);
+                    return (<div style={{ background: al ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (al ? "#7f1d1d" : "#14532d"), borderRadius: 14, padding: "14px 18px" }}><div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div><div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}><div><div style={{ fontSize: 10, color: "#475569" }}>Mov.</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>{totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}{totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}<div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>{pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}{dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, color: al ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}</div>{al && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>⚠️ Diferencia significativa</div>}</div>);
                   })()}
                   <button onClick={saveCaja} style={{ ...S.btn, width: "100%" }}>📋 Guardar cierre de turno</button>
                 </div>
@@ -1565,7 +1565,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {rankingEmpleados.map((emp, i) => {
                     const isRisk = emp.difTotal > 5000 || emp.difNeg > 2;
-                    return (<div key={emp.id} style={{ background: "#0a0a0f", border: `1px solid ${isRisk ? "#7f1d1d" : "#2a1f4a"}`, borderRadius: 12, padding: "14px 16px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: i === 0 ? "#f87171" : i === 1 ? "#fbbf24" : "#7c6fa0", fontSize: 16, width: 24 }}>#{i + 1}</div><div><div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14 }}>{emp.nombre}</div><div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 2 }}>{emp.turnos} turnos · {emp.difNeg} dif. negativa{emp.difNeg !== 1 ? "s" : ""}</div></div></div><div style={{ textAlign: "right" }}><div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: isRisk ? "#f87171" : "#7c6fa0", fontSize: 16 }}>{fmt(emp.difTotal)}</div></div></div><div style={{ display: "flex", gap: 16, fontSize: 12 }}><div><span style={{ color: "#4c3a70" }}>Bonos: </span><span style={{ color: "#a78bfa", fontWeight: 600 }}>{fmt(emp.totalBonos)}</span></div>{isRisk && <div style={{ color: "#f87171", fontWeight: 600 }}>⚠️ Requiere atención</div>}</div></div>);
+                    return (<div key={emp.id} style={{ background: "#0a0a0f", border: "1px solid " + (isRisk ? "#7f1d1d" : "#2a1f4a"), borderRadius: 12, padding: "14px 16px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: i === 0 ? "#f87171" : i === 1 ? "#fbbf24" : "#7c6fa0", fontSize: 16, width: 24 }}>#{i + 1}</div><div><div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14 }}>{emp.nombre}</div><div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 2 }}>{emp.turnos} turnos · {emp.difNeg} dif. negativa{emp.difNeg !== 1 ? "s" : ""}</div></div></div><div style={{ textAlign: "right" }}><div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: isRisk ? "#f87171" : "#7c6fa0", fontSize: 16 }}>{fmt(emp.difTotal)}</div></div></div><div style={{ display: "flex", gap: 16, fontSize: 12 }}><div><span style={{ color: "#4c3a70" }}>Bonos: </span><span style={{ color: "#a78bfa", fontWeight: 600 }}>{fmt(emp.totalBonos)}</span></div>{isRisk && <div style={{ color: "#f87171", fontWeight: 600 }}>⚠️ Requiere atención</div>}</div></div>);
                   })}
                 </div>
               </div>
@@ -2105,7 +2105,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                   const newBills = assigned ? empBills.filter(x => x !== b.id) : [...empBills, b.id];
                                   db.updateEmpleado(emp.id, { billeteras: newBills });
                                   setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, billeteras: newBills } : x));
-                                }} style={{ padding: "6px 14px", border: `1px solid ${assigned ? "#7c3aed" : "#1a1530"}`, borderRadius: 8, background: assigned ? "#2d1b69" : "#0a0a0f", color: assigned ? "#c084fc" : "#4c3a70", cursor: "pointer", fontSize: 12, fontWeight: assigned ? 700 : 400 }}>
+                                }} style={{ padding: "6px 14px", border: "1px solid " + (assigned ? "#7c3aed" : "#1a1530"), borderRadius: 8, background: assigned ? "#2d1b69" : "#0a0a0f", color: assigned ? "#c084fc" : "#4c3a70", cursor: "pointer", fontSize: 12, fontWeight: assigned ? 700 : 400 }}>
                                   💳 {b.nombre}
                                 </button>
                               );
