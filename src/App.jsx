@@ -2,6 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from "recharts";
 import { supabase } from "./supabase.js";
 
+// Inject Space Grotesk font
+if (typeof document !== "undefined" && !document.getElementById("sg-font")) {
+  const l = document.createElement("link");
+  l.id = "sg-font";
+  l.rel = "stylesheet";
+  l.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap";
+  document.head.appendChild(l);
+}
+
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const SA = { user: "admin", pass: "admin2024" };
 const DIAS = [
@@ -14,12 +23,20 @@ const DIA_MAP = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"];
 
 // ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
 const C = {
-  bg: "#0d0b1a",
-  card: "#13102a",
-  border: "#2a1f4a",
-  accent: "#9f67ff",
+  bg: "#080612",
+  card: "#0f0d1f",
+  cardGlass: "rgba(15,13,31,0.7)",
+  border: "#1e1a3a",
+  borderGlow: "rgba(124,58,237,0.25)",
+  accent: "#7c3aed",
+  accentLight: "#a78bfa",
+  accentGlow: "rgba(124,58,237,0.15)",
+  success: "#10b981",
+  danger: "#f43f5e",
+  warning: "#f59e0b",
   text: "#f1f5f9",
-  muted: "#475569",
+  textSub: "#94a3b8",
+  muted: "#334155",
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
@@ -111,38 +128,38 @@ const parseCSV = (text, existingPFS = {}) => {
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 const S = {
-  page: { minHeight: "100vh", background: "#07070f", color: "#f1f5f9", fontFamily: "'Inter', 'DM Sans', sans-serif" },
-  card: { background: "#0e0e1a", border: "1px solid #1e1e38", borderRadius: 18, padding: "22px 24px" },
-  input: { width: "100%", background: "#0a0a16", border: "1px solid #1e1e38", borderRadius: 11, padding: "11px 14px", color: "#f1f5f9", fontSize: 14, outline: "none", boxSizing: "border-box" },
-  btn: { background: "linear-gradient(135deg,#7c3aed,#4f46e5)", border: "none", color: "#fff", padding: "12px 22px", borderRadius: 11, cursor: "pointer", fontSize: 14, fontWeight: 600, boxShadow: "0 4px 14px rgba(124,58,237,0.3)" },
-  ghost: { background: "transparent", border: "1px solid #1e1e38", color: "#a78bfa", padding: "9px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 500 },
-  danger: { background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", padding: "7px 11px", borderRadius: 8, cursor: "pointer", fontSize: 12 },
-  label: { fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 7, fontWeight: 600 },
-  subBtn: (a) => ({ padding: "8px 16px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, borderRadius: 9, background: a ? "linear-gradient(135deg,#7c3aed,#4f46e5)" : "#0e0e1a", color: a ? "#fff" : "#475569", border: a ? "none" : "1px solid #1e1e38" }),
+  page: { minHeight: "100vh", background: "radial-gradient(ellipse 120% 80% at 50% -10%, rgba(124,58,237,0.08) 0%, #080612 50%)", color: "#f1f5f9", fontFamily: "'Space Grotesk', 'DM Sans', 'Inter', sans-serif" },
+  card: { background: "rgba(15,13,31,0.8)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: 16, padding: "20px 22px", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", boxShadow: "0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)" },
+  input: { width: "100%", background: "rgba(8,6,18,0.8)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "11px 14px", color: "#f1f5f9", fontSize: 14, outline: "none", boxSizing: "border-box", transition: "border-color 150ms ease" },
+  btn: { background: "linear-gradient(135deg,#7c3aed 0%,#6d28d9 50%,#4f46e5 100%)", border: "none", color: "#fff", padding: "12px 22px", borderRadius: 10, cursor: "pointer", fontSize: 14, fontWeight: 600, boxShadow: "0 4px 20px rgba(124,58,237,0.4), 0 1px 0 rgba(255,255,255,0.1) inset", letterSpacing: "0.01em", transition: "all 150ms ease" },
+  ghost: { background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.25)", color: "#a78bfa", padding: "9px 16px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 500, transition: "all 150ms ease" },
+  danger: { background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.25)", color: "#fb7185", padding: "7px 11px", borderRadius: 8, cursor: "pointer", fontSize: 12, transition: "all 150ms ease" },
+  label: { fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 7, fontWeight: 700 },
+  subBtn: (a) => ({ padding: "8px 16px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, borderRadius: 9, background: a ? "linear-gradient(135deg,#7c3aed,#4f46e5)" : "rgba(15,13,31,0.8)", color: a ? "#fff" : "#64748b", border: a ? "none" : "1px solid rgba(124,58,237,0.15)", boxShadow: a ? "0 2px 12px rgba(124,58,237,0.3)" : "none", transition: "all 150ms ease" }),
 };
 
 const Trend = ({ value, invert = false }) => {
   let n = +value; if (invert) n = -n;
-  if (n > 0) return <span style={{ color: "#4ade80", fontSize: 13, fontWeight: 600 }}>▲ {Math.abs(+value)}%</span>;
-  if (n < 0) return <span style={{ color: "#f87171", fontSize: 13, fontWeight: 600 }}>▼ {Math.abs(+value)}%</span>;
-  return <span style={{ color: "#475569", fontSize: 13 }}>— 0%</span>;
+  if (n > 0) return <span style={{ color: "#10b981", fontSize: 12, fontWeight: 700, background: "rgba(16,185,129,0.1)", padding: "2px 8px", borderRadius: 6, letterSpacing: "0.02em" }}>↑ {Math.abs(+value)}%</span>;
+  if (n < 0) return <span style={{ color: "#f43f5e", fontSize: 12, fontWeight: 700, background: "rgba(244,63,94,0.1)", padding: "2px 8px", borderRadius: 6, letterSpacing: "0.02em" }}>↓ {Math.abs(+value)}%</span>;
+  return <span style={{ color: "#64748b", fontSize: 12, background: "rgba(100,116,139,0.1)", padding: "2px 8px", borderRadius: 6 }}>— 0%</span>;
 };
 
 const StatCard = ({ icon, label, value, sub, color = "#a78bfa", trend, onClick }) => (
   <div onClick={onClick} style={{ ...S.card, cursor: onClick ? "pointer" : "default", borderColor: color + "25", background: `linear-gradient(135deg,${color}0a,#0e0e1a)` }}>
     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-      <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600 }}>{label}</div>
       <span style={{ fontSize: 20 }}>{icon}</span>
     </div>
-    <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 24, fontWeight: 700, color, marginBottom: 5, letterSpacing: "-0.02em" }}>{value}</div>
-    {sub && <div style={{ fontSize: 11, color: "#475569" }}>{sub}</div>}
+    <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 24, fontWeight: 700, color, marginBottom: 5, letterSpacing: "-0.02em" }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: "#64748b" }}>{sub}</div>}
     {trend !== undefined && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>vs mes ant.: <Trend value={trend} /></div>}
   </div>
 );
 
 const Badge = ({ ok }) => (
-  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: ok ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", color: ok ? "#4ade80" : "#f87171", border: "1px solid " + (ok ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"), borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
-    <span style={{ width: 5, height: 5, borderRadius: "50%", background: ok ? "#4ade80" : "#f87171" }} />{ok ? "OK" : "Alerta"}
+  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: ok ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)", color: ok ? "#10b981" : "#f43f5e", border: "1px solid " + (ok ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"), borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>
+    <span style={{ width: 5, height: 5, borderRadius: "50%", background: ok ? "#10b981" : "#f43f5e" }} />{ok ? "OK" : "Alerta"}
   </span>
 );
 
@@ -234,22 +251,22 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "radial-gradient(ellipse at 50% 0%, #1a0533 0%, #07070f 60%)" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "radial-gradient(ellipse 100% 60% at 50% -5%, rgba(124,58,237,0.2) 0%, #080612 55%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(79,70,229,0.08) 0%, transparent 60%)" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div style={{ width: "100%", maxWidth: 400 }}>
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ width: 60, height: 60, borderRadius: 18, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 16px", boxShadow: "0 8px 28px rgba(124,58,237,0.4)" }}>🎰</div>
-          <h1 style={{ fontFamily: "'Inter',sans-serif", fontSize: 28, fontWeight: 800, margin: 0, background: "linear-gradient(90deg,#c084fc,#818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Casino Panel</h1>
-          <p style={{ color: "#475569", fontSize: 13, marginTop: 6 }}>Plataforma de gestión operativa</p>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={{ width: 64, height: 64, borderRadius: 20, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 20px", boxShadow: "0 8px 32px rgba(124,58,237,0.5), 0 0 0 1px rgba(255,255,255,0.06) inset" }}>🎰</div>
+          <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 30, fontWeight: 700, margin: 0, background: "linear-gradient(135deg,#c084fc 0%,#a78bfa 50%,#818cf8 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "-0.02em" }}>Casino Panel</h1>
+          <p style={{ color: "#64748b", fontSize: 13, marginTop: 8, letterSpacing: "0.02em" }}>Plataforma de gestión operativa</p>
         </div>
-        <div style={{ ...S.card, padding: 28, borderColor: "#2a1f4a" }}>
+        <div style={{ ...S.card, padding: 32, border: "1px solid rgba(124,58,237,0.2)" }}>
           {[{ label: "Usuario", val: user, set: setUser, type: "text", ph: "tu_usuario" }, { label: "Contraseña", val: pass, set: setPass, type: "password", ph: "••••••••" }].map(f => (
             <div key={f.label} style={{ marginBottom: 16 }}>
               <label style={S.label}>{f.label}</label>
               <input type={f.type} value={f.val} placeholder={f.ph} onChange={e => f.set(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={S.input} />
             </div>
           ))}
-          {err && <div style={{ color: "#f87171", fontSize: 12, marginBottom: 14, textAlign: "center", background: "rgba(239,68,68,0.08)", padding: "9px 14px", borderRadius: 9 }}>{err}</div>}
+          {err && <div style={{ color: "#f43f5e", fontSize: 12, marginBottom: 14, textAlign: "center", background: "rgba(239,68,68,0.08)", padding: "9px 14px", borderRadius: 9 }}>{err}</div>}
           <button onClick={submit} disabled={loading} style={{ ...S.btn, width: "100%", padding: 14, fontSize: 15, opacity: loading ? 0.7 : 1 }}>
             {loading ? "Verificando..." : "Ingresar →"}
           </button>
@@ -291,10 +308,10 @@ const SuperAdmin = ({ onLogout }) => {
 
   return (
     <div style={S.page}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
       {toast && <div style={{ position: "fixed", top: 20, right: 20, background: "#1e1b3a", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 20px", fontSize: 14, zIndex: 9999 }}>{toast}</div>}
-      <div style={{ background: "linear-gradient(135deg,#1a0533,#0d1b3e)", borderBottom: "1px solid #2a1f4a", padding: "18px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 22 }}>🛡️</span><h1 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#c084fc" }}>Super Admin</h1></div>
+      <div style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(8,6,18,0.9))", borderBottom: "1px solid #2a1f4a", padding: "18px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 22 }}>🛡️</span><h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#c4b5fd" }}>Super Admin</h1></div>
         <button onClick={onLogout} style={S.ghost}>Cerrar sesión</button>
       </div>
       <div style={{ padding: "24px 28px", maxWidth: 700, margin: "0 auto" }}>
@@ -307,13 +324,13 @@ const SuperAdmin = ({ onLogout }) => {
           </div>
           <button onClick={addTenant} disabled={saving} style={{ ...S.btn, opacity: saving ? 0.7 : 1 }}>{saving ? "Creando..." : "Crear panel"}</button>
         </div>
-        <div style={{ fontSize: 13, color: "#7c6fa0", marginBottom: 12 }}>{tenants.length} panel{tenants.length !== 1 ? "es" : ""} registrado{tenants.length !== 1 ? "s" : ""}</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>{tenants.length} panel{tenants.length !== 1 ? "es" : ""} registrado{tenants.length !== 1 ? "s" : ""}</div>
         {tenants.map(t => (
           <div key={t.id} style={{ ...S.card, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 10 }}>
             <div>
-              <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: "#c084fc", fontSize: 15 }}>🎰 {t.nombre}</div>
-              <div style={{ fontSize: 12, color: "#7c6fa0", marginTop: 4 }}>👤 <strong style={{ color: "#e2e8f0" }}>{t.usuario}</strong> · 🔑 <strong style={{ color: "#e2e8f0" }}>{t.pass}</strong></div>
-              <div style={{ fontSize: 11, color: "#4c3a70", marginTop: 2 }}>Creado: {new Date(t.creado_at).toLocaleDateString("es-AR")}</div>
+              <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, color: "#c4b5fd", fontSize: 15 }}>🎰 {t.nombre}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>👤 <strong style={{ color: "#e2e8f0" }}>{t.usuario}</strong> · 🔑 <strong style={{ color: "#e2e8f0" }}>{t.pass}</strong></div>
+              <div style={{ fontSize: 11, color: "#4b5563", marginTop: 2 }}>Creado: {new Date(t.creado_at).toLocaleDateString("es-AR")}</div>
             </div>
             <button onClick={() => deleteTenant(t.id)} style={S.danger}>🗑️ Eliminar</button>
           </div>
@@ -461,15 +478,15 @@ const EmployeeView = ({ session, onLogout }) => {
     return (
       <div style={{ ...S.card, marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div><div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600 }}>📤 Bajas del turno</div></div>
-          <button onClick={add} style={{ background: "#1c1200", border: "1px solid #92400e", color: "#fbbf24", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
+          <div><div style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>📤 Bajas del turno</div></div>
+          <button onClick={add} style={{ background: "#1c1200", border: "1px solid #92400e", color: "#f59e0b", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
         </div>
-        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Sin bajas</div> : (
+        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>Sin bajas</div> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {items.map(item => {
               const dest = destinos.find(d => d.id === item.destinoId);
               return (
-                <div key={item.id} style={{ background: "#0a0a0f", border: "1px solid #92400e", borderRadius: 10, padding: "12px 14px" }}>
+                <div key={item.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid #92400e", borderRadius: 10, padding: "12px 14px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, marginBottom: 8, alignItems: "end" }}>
                     <div><label style={S.label}>Billetera</label><select value={item.billeteraId} onChange={e => upd(item.id, "billeteraId", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px", appearance: "none" }}><option value="">—</option>{bills.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
                     <div><label style={S.label}>Destino</label><select value={item.destinoId} onChange={e => upd(item.id, "destinoId", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px", appearance: "none" }}><option value="">—</option>{destinos.map(d => <option key={d.id} value={d.id}>{d.alias}</option>)}</select></div>
@@ -479,11 +496,11 @@ const EmployeeView = ({ session, onLogout }) => {
                     <div><label style={S.label}>Monto ($)</label><input type="number" value={item.monto} placeholder="0" onChange={e => upd(item.id, "monto", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                     <div><label style={S.label}>Nota</label><input type="text" value={item.nota || ""} onChange={e => upd(item.id, "nota", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   </div>
-                  {dest && <div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 6 }}>🏦 {dest.titular} · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{dest.cbu}</span></div>}
+                  {dest && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>🏦 {dest.titular} · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{dest.cbu}</span></div>}
                 </div>
               );
             })}
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#7c6fa0" }}>Total bajas</span><span style={{ color: "#fbbf24", fontWeight: 700 }}>{fmt(total)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#6b7280" }}>Total bajas</span><span style={{ color: "#f59e0b", fontWeight: 700 }}>{fmt(total)}</span></div>
           </div>
         )}
       </div>
@@ -500,12 +517,12 @@ const EmployeeView = ({ session, onLogout }) => {
       <div style={{ ...S.card, marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div><div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 600 }}>🎁 Bonos entregados</div></div>
-          <button onClick={add} style={{ background: "#1a0533", border: "1px solid #7c3aed", color: "#c084fc", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
+          <button onClick={add} style={{ background: "rgba(124,58,237,0.1)", border: "1px solid #7c3aed", color: "#c4b5fd", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
         </div>
-        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Sin bonos</div> : (
+        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>Sin bonos</div> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {items.map(item => (
-              <div key={item.id} style={{ background: "#0a0a0f", border: "1px solid #4c1d95", borderRadius: 10, padding: "12px 14px" }}>
+              <div key={item.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid #4c1d95", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <div><label style={S.label}>Jugador</label><input type="text" value={item.jugador} onChange={e => upd(item.id, "jugador", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   <div><label style={S.label}>Monto ($)</label><input type="number" value={item.monto} placeholder="0" onChange={e => upd(item.id, "monto", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
@@ -514,7 +531,7 @@ const EmployeeView = ({ session, onLogout }) => {
                 </div>
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#7c6fa0" }}>Total bonos</span><span style={{ color: "#a78bfa", fontWeight: 700 }}>{fmt(total)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#6b7280" }}>Total bonos</span><span style={{ color: "#a78bfa", fontWeight: 700 }}>{fmt(total)}</span></div>
           </div>
         )}
       </div>
@@ -523,37 +540,37 @@ const EmployeeView = ({ session, onLogout }) => {
 
   return (
     <div style={S.page}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
       {toast && <div style={{ position: "fixed", top: 20, right: 20, background: "#1e1b3a", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 20px", fontSize: 14, zIndex: 9999 }}>{toast}</div>}
-      <div style={{ background: "linear-gradient(135deg,#1a0533,#0d1b3e)", borderBottom: "1px solid #1e1e38", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(8,6,18,0.9))", borderBottom: "1px solid #1e1e38", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🎰</div><span style={{ fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800, background: "linear-gradient(90deg,#c084fc,#818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{config?.nombre || "Casino Panel"}</span></div>
-          <div style={{ fontSize: 12, color: "#475569", marginTop: 2, marginLeft: 42 }}>👤 {session.nombre}{session.horario_inicio ? ` · ⏰ ${session.horario_inicio}${session.horario_fin ? " – " + session.horario_fin : ""}` : ""}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🎰</div><span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 18, fontWeight: 800, background: "linear-gradient(90deg,#c084fc,#818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{config?.nombre || "Casino Panel"}</span></div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2, marginLeft: 42 }}>👤 {session.nombre}{session.horario_inicio ? ` · ⏰ ${session.horario_inicio}${session.horario_fin ? " – " + session.horario_fin : ""}` : ""}</div>
         </div>
         <button onClick={onLogout} style={S.ghost}>Salir</button>
       </div>
       <div style={{ padding: "20px 24px", maxWidth: 680, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid #1e1e38", paddingBottom: 2 }}>
           {[{ id: "cargar", label: "📋 Cargar Turno" }, { id: "historial", label: "📊 Mis Turnos" }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "9px 16px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: tab === t.id ? 700 : 500, borderRadius: "8px 8px 0 0", background: tab === t.id ? "#07070f" : "transparent", color: tab === t.id ? "#9f67ff" : "#475569", borderBottom: tab === t.id ? "2px solid #9f67ff" : "2px solid transparent" }}>{t.label}</button>
+            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "9px 16px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: tab === t.id ? 700 : 500, borderRadius: "8px 8px 0 0", background: tab === t.id ? "#080612" : "transparent", color: tab === t.id ? "#a78bfa" : "#64748b", borderBottom: tab === t.id ? "2px solid #9f67ff" : "2px solid transparent" }}>{t.label}</button>
           ))}
         </div>
 
         {tab === "historial" && (
           <div>
-            <div style={{ fontSize: 12, color: "#475569", marginBottom: 14 }}>Tus últimos turnos registrados</div>
-            {myTurnos.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#475569" }}>No tenés turnos registrados todavía.</div> : (
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>Tus últimos turnos registrados</div>
+            {myTurnos.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>No tenés turnos registrados todavía.</div> : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {myTurnos.map(t => (
                   <div key={t.fecha + t.turno_id} style={{ ...S.card }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                       <div>
                         <div style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>{new Date(t.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
-                        <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{t.turno_label || t.turno_id}</div>
+                        <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{t.turno_label || t.turno_id}</div>
                       </div>
                       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                        {[{ label: "Apertura", v: t.tI, c: "#38bdf8" }, { label: "Cierre", v: t.tC, c: "#f87171" }, { label: "Neto", v: t.mov, c: t.mov >= 0 ? "#4ade80" : "#f87171" }].map(x => (
-                          <div key={x.label} style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div><div style={{ color: x.c, fontWeight: 700 }}>{fmt(x.v)}</div></div>
+                        {[{ label: "Apertura", v: t.tI, c: "#38bdf8" }, { label: "Cierre", v: t.tC, c: "#f43f5e" }, { label: "Neto", v: t.mov, c: t.mov >= 0 ? "#10b981" : "#f43f5e" }].map(x => (
+                          <div key={x.label} style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>{x.label}</div><div style={{ color: x.c, fontWeight: 700 }}>{fmt(x.v)}</div></div>
                         ))}
                       </div>
                     </div>
@@ -569,7 +586,7 @@ const EmployeeView = ({ session, onLogout }) => {
             {!trabajaHoy && (
               <div style={{ background: "linear-gradient(135deg,#1a0a00,#2d1500)", border: "1px solid #92400e", borderRadius: 12, padding: "14px 18px", marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
                 <span style={{ fontSize: 24 }}>😴</span>
-                <div><div style={{ color: "#fbbf24", fontWeight: 700, fontSize: 14 }}>Hoy es tu franco</div><div style={{ color: "#a16207", fontSize: 12, marginTop: 2 }}>Podés cargar igual si es necesario.</div></div>
+                <div><div style={{ color: "#f59e0b", fontWeight: 700, fontSize: 14 }}>Hoy es tu franco</div><div style={{ color: "#a16207", fontSize: 12, marginTop: 2 }}>Podés cargar igual si es necesario.</div></div>
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
@@ -581,11 +598,11 @@ const EmployeeView = ({ session, onLogout }) => {
             </div>
 
             {bills.length === 0 ? (
-              <div style={{ ...S.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 32, marginBottom: 10 }}>💳</div><div style={{ color: "#475569" }}>El dueño todavía no configuró las billeteras.</div></div>
+              <div style={{ ...S.card, textAlign: "center", padding: 32 }}><div style={{ fontSize: 32, marginBottom: 10 }}>💳</div><div style={{ color: "#64748b" }}>El dueño todavía no configuró las billeteras.</div></div>
             ) : (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                  {[{ label: "🌅 Apertura", key: "inicio", color: "#38bdf8", ro: true }, { label: "🌆 Cierre", key: "cierre", color: "#f87171", ro: false }].map(col => {
+                  {[{ label: "🌅 Apertura", key: "inicio", color: "#38bdf8", ro: true }, { label: "🌆 Cierre", key: "cierre", color: "#f43f5e", ro: false }].map(col => {
                     const total = bills.reduce((s, b) => s + (+(form[col.key][b.id] || 0)), 0);
                     const editingApertura = editApertura && col.key === "inicio";
                     return (
@@ -593,7 +610,7 @@ const EmployeeView = ({ session, onLogout }) => {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                           <div style={{ fontSize: 12, color: col.color, fontWeight: 700 }}>{col.label}</div>
                           {col.key === "inicio" && (
-                            <button onClick={() => setEditApertura(!editApertura)} style={{ background: editApertura ? "#2d1b69" : "transparent", border: "1px solid " + (editApertura ? "#7c3aed" : "#2a1f4a"), color: editApertura ? "#c084fc" : "#475569", padding: "3px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>
+                            <button onClick={() => setEditApertura(!editApertura)} style={{ background: editApertura ? "rgba(124,58,237,0.2)" : "transparent", border: "1px solid " + (editApertura ? "#7c3aed" : "rgba(124,58,237,0.2)"), color: editApertura ? "#c4b5fd" : "#64748b", padding: "3px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>
                               {editApertura ? "✓ Listo" : "✏️ Corregir"}
                             </button>
                           )}
@@ -605,12 +622,12 @@ const EmployeeView = ({ session, onLogout }) => {
                               <label style={{ ...S.label, display: "flex", justifyContent: "space-between" }}><span>{b.nombre}</span>{col.ro && !!cajaForm.inicio[b.id] && !isEditing && <span style={{ color: "#2d4a7c", fontSize: 10, fontWeight: 400, textTransform: "none" }}>↻ auto</span>}</label>
                               <input type="text" inputMode="numeric" value={form[col.key][b.id] ?? ""} placeholder="0" readOnly={isAuto}
                                 onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setForm(prev => ({ ...prev, [col.key]: { ...prev[col.key], [b.id]: v } })); }}
-                                style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} />
+                                style={{ ...S.input, background: "rgba(8,6,18,0.8)", color: "#f1f5f9" }} />
                             </div>
                           );
                         })}
                         <div style={{ borderTop: "1px solid #1e1e38", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                          <span style={{ color: "#475569" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span>
+                          <span style={{ color: "#64748b" }}>Total</span><span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span>
                         </div>
                         {editingApertura && (
                           <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(124,58,237,0.08)", borderRadius: 9, fontSize: 12, color: "#a78bfa" }}>
@@ -624,12 +641,12 @@ const EmployeeView = ({ session, onLogout }) => {
                 <BajasForm />
                 <BonosForm />
                 {bills.some(b => form.cierre[b.id]) && (
-                  <div style={{ background: "#0a0a14", border: "1px solid " + (hasAlert ? "#7f1d1d" : "#1e1e38"), borderRadius: 14, padding: "18px 20px", marginBottom: 14 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#9f67ff", marginBottom: 16 }}>📋 Resumen del turno</div>
+                  <div style={{ background: "rgba(8,6,18,0.7)", border: "1px solid " + (hasAlert ? "#7f1d1d" : "rgba(124,58,237,0.15)"), borderRadius: 14, padding: "18px 20px", marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", marginBottom: 16 }}>📋 Resumen del turno</div>
 
                     {/* BLOQUE 1: Lo que dio la caja */}
-                    <div style={{ background: "#07070f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
-                      <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>💼 Lo que dio la caja</div>
+                    <div style={{ background: "#080612", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>💼 Lo que dio la caja</div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                           <span style={{ color: "#94a3b8" }}>Cierre de billeteras</span>
@@ -637,12 +654,12 @@ const EmployeeView = ({ session, onLogout }) => {
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                           <span style={{ color: "#94a3b8" }}>Apertura de billeteras</span>
-                          <span style={{ color: "#f87171", fontWeight: 700 }}>− {fmt(tI)}</span>
+                          <span style={{ color: "#f43f5e", fontWeight: 700 }}>− {fmt(tI)}</span>
                         </div>
                         {totalBajas > 0 && (
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                            <span style={{ color: "#94a3b8" }}>Bajas realizadas <span style={{ fontSize: 11, color: "#475569" }}>(plata que salió)</span></span>
-                            <span style={{ color: "#fbbf24", fontWeight: 700 }}>+ {fmt(totalBajas)}</span>
+                            <span style={{ color: "#94a3b8" }}>Bajas realizadas <span style={{ fontSize: 11, color: "#64748b" }}>(plata que salió)</span></span>
+                            <span style={{ color: "#f59e0b", fontWeight: 700 }}>+ {fmt(totalBajas)}</span>
                           </div>
                         )}
                         {totalBonos > 0 && (
@@ -653,17 +670,17 @@ const EmployeeView = ({ session, onLogout }) => {
                         )}
                         <div style={{ borderTop: "1px solid #1e1e38", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
                           <span style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14 }}>Total movimiento de caja</span>
-                          <span style={{ color: mov >= 0 ? "#4ade80" : "#f87171", fontWeight: 800, fontSize: 20 }}>{fmt(mov)}</span>
+                          <span style={{ color: mov >= 0 ? "#10b981" : "#f43f5e", fontWeight: 800, fontSize: 20 }}>{fmt(mov)}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* BLOQUE 2: Lo que marcó la plataforma en el horario del turno */}
                     {(turnoTxs || de) && (
-                      <div style={{ background: "#07070f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
-                        <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>📊 Lo que marcó la plataforma</div>
+                      <div style={{ background: "#080612", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>📊 Lo que marcó la plataforma</div>
                         {turnoTxs?.horIni && (
-                          <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 10 }}>
                             ✅ Filtrado por tu horario: {turnoTxs.horIni}{turnoTxs.horFin ? ` – ${turnoTxs.horFin}` : ""} · {turnoTxs.cant} transacciones
                           </div>
                         )}
@@ -677,18 +694,18 @@ const EmployeeView = ({ session, onLogout }) => {
                             const ini = toMins(hi), fin = toMins(hf);
                             const dur = fin > ini ? fin - ini : (1440 - ini + fin);
                             const pct = Math.round((dur / 1440) * 100);
-                            return <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>📊 Proporcional a tu turno ({hi} – {hf} · {pct}% del día)</div>;
+                            return <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 10 }}>📊 Proporcional a tu turno ({hi} – {hf} · {pct}% del día)</div>;
                           }
-                          return <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 10 }}>Total del día (sin horario configurado)</div>;
+                          return <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 10 }}>Total del día (sin horario configurado)</div>;
                         })()}
                         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                             <span style={{ color: "#94a3b8" }}>Cargas</span>
-                            <span style={{ color: "#4ade80", fontWeight: 700 }}>{fmt(turnoTxs ? turnoTxs.cargas : de.cargas)}</span>
+                            <span style={{ color: "#10b981", fontWeight: 700 }}>{fmt(turnoTxs ? turnoTxs.cargas : de.cargas)}</span>
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                             <span style={{ color: "#94a3b8" }}>Retiros</span>
-                            <span style={{ color: "#f87171", fontWeight: 700 }}>− {fmt(turnoTxs ? turnoTxs.retiros : de.retiros)}</span>
+                            <span style={{ color: "#f43f5e", fontWeight: 700 }}>− {fmt(turnoTxs ? turnoTxs.retiros : de.retiros)}</span>
                           </div>
                           <div style={{ borderTop: "1px solid #1e1e38", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
                             <span style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14 }}>Neto del turno</span>
@@ -703,17 +720,17 @@ const EmployeeView = ({ session, onLogout }) => {
                       <div style={{ background: hasAlert ? "rgba(248,113,113,0.07)" : "rgba(74,222,128,0.07)", border: `1px solid ${hasAlert ? "#7f1d1d" : "#14532d"}`, borderRadius: 12, padding: "14px 16px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: hasAlert ? "#f87171" : "#4ade80" }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: hasAlert ? "#f43f5e" : "#10b981" }}>
                               {hasAlert ? "⚠️ Hay una diferencia" : "✅ La caja cierra bien"}
                             </div>
-                            <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
+                            <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
                               {hasAlert
                                 ? `La caja dio ${dif > 0 ? fmt(dif) + " más" : fmt(Math.abs(dif)) + " menos"} que el panel`
                                 : "El movimiento de caja coincide con el panel"}
                             </div>
                           </div>
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 24, fontWeight: 800, color: hasAlert ? "#f87171" : "#4ade80" }}>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: hasAlert ? "#f43f5e" : "#10b981" }}>
                               {dif > 0 ? "+" : ""}{fmt(dif)}
                             </div>
                           </div>
@@ -721,7 +738,7 @@ const EmployeeView = ({ session, onLogout }) => {
                       </div>
                     )}
                     {!de && !turnoTxs && (
-                      <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#fbbf24" }}>
+                      <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#f59e0b" }}>
                         ℹ️ No hay datos del panel para esta fecha — no se puede comparar todavía.
                       </div>
                     )}
@@ -763,7 +780,7 @@ const LiquidacionCalc = ({ empleados }) => {
           <div style={{ flex: 1 }}><label style={S.label}>Hasta</label><input type="date" value={liquidHasta} onChange={e => setLiquidHasta(e.target.value)} style={S.input} /></div>
         </div>
       )}
-      <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 16, fontSize: 12, color: "#9f67ff" }}>
+      <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 16, fontSize: 12, color: "#a78bfa" }}>
         Calculando para <strong>{dias} dia{dias !== 1 ? "s" : ""}</strong> · {periodoActual?.label}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -772,27 +789,27 @@ const LiquidacionCalc = ({ empleados }) => {
           const diasEfectivos = Math.round(dias * diasTrabajados / 7);
           const total = (emp.valor_hora || 0) * (emp.horas_por_dia || 8) * diasEfectivos;
           return (
-            <div key={emp.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div key={emp.id} style={{ background: "#080612", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
               <div>
                 <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {emp.nombre}</div>
-                <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
                   {diasEfectivos} dias · {emp.horas_por_dia || 8}h/dia · ${(emp.valor_hora || 0).toLocaleString("es-AR")}/h
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "#4ade80" }}>{fmt(total)}</div>
-                <div style={{ fontSize: 11, color: "#475569" }}>a pagar</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#10b981" }}>{fmt(total)}</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>a pagar</div>
               </div>
             </div>
           );
         })}
         {empleados.filter(e => e.activo && e.valor_hora > 0).length === 0 && (
-          <div style={{ textAlign: "center", padding: 24, color: "#475569", fontSize: 13 }}>Configura el valor hora de los empleados arriba para ver los calculos.</div>
+          <div style={{ textAlign: "center", padding: 24, color: "#64748b", fontSize: 13 }}>Configura el valor hora de los empleados arriba para ver los calculos.</div>
         )}
         {empleados.filter(e => e.activo && e.valor_hora > 0).length > 0 && (
-          <div style={{ background: "linear-gradient(135deg,rgba(74,222,128,0.08),rgba(16,185,129,0.04))", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontWeight: 700, color: "#4ade80", fontSize: 14 }}>Total a pagar</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "#4ade80" }}>
+          <div style={{ background: "linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.04))", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 12, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontWeight: 700, color: "#10b981", fontSize: 14 }}>Total a pagar</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "#10b981" }}>
               {fmt(empleados.filter(e => e.activo && e.valor_hora > 0).reduce((sum, emp) => {
                 const diasTrabajados = (emp.dias || DIAS.map(d => d.id)).length;
                 const diasEfectivos = Math.round(dias * diasTrabajados / 7);
@@ -824,12 +841,12 @@ const CajaBilleteraCol = ({ col, cajaForm, setCajaForm, bills, empleados, editCa
             </label>
             <input type="text" inputMode="numeric" value={cajaForm[col.fk][b.id] ?? ""} placeholder="0" readOnly={false}
               onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ""); setCajaForm(prev => ({ ...prev, [col.fk]: { ...prev[col.fk], [b.id]: v } })); }}
-              style={{ ...S.input, background: "#0a0a16", color: "#f1f5f9" }} />
+              style={{ ...S.input, background: "rgba(8,6,18,0.8)", color: "#f1f5f9" }} />
           </div>
         ))}
       </div>
       <div style={{ borderTop: "1px solid #1e1e38", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-        <span style={{ color: "#475569" }}>Total</span>
+        <span style={{ color: "#64748b" }}>Total</span>
         <span style={{ fontWeight: 700, color: col.color }}>{fmt(total)}</span>
       </div>
     </div>
@@ -842,24 +859,24 @@ const DiaSummary = ({ day, fmt }) => {
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
-        {[{ label: "Neto del Panel", value: day.panelNeto !== null ? fmt(day.panelNeto) : "Sin datos", color: "#a78bfa", icon: "📊" }, { label: "Mov. Real Caja", value: day.dayTurnos.some(t => t.exists) ? fmt(day.totalMov) : "Sin datos", color: day.totalMov >= 0 ? "#4ade80" : "#f87171", icon: "💼" }, { label: "Diferencia", value: day.dif !== null ? fmt(day.dif) : "—", color: alertDay ? "#f87171" : "#4ade80", icon: alertDay ? "⚠️" : "✅" }].map(k => (
+        {[{ label: "Neto del Panel", value: day.panelNeto !== null ? fmt(day.panelNeto) : "Sin datos", color: "#a78bfa", icon: "📊" }, { label: "Mov. Real Caja", value: day.dayTurnos.some(t => t.exists) ? fmt(day.totalMov) : "Sin datos", color: day.totalMov >= 0 ? "#10b981" : "#f43f5e", icon: "💼" }, { label: "Diferencia", value: day.dif !== null ? fmt(day.dif) : "—", color: alertDay ? "#f43f5e" : "#10b981", icon: alertDay ? "⚠️" : "✅" }].map(k => (
           <div key={k.label} style={{ ...S.card, border: alertDay && k.label === "Diferencia" ? "1px solid #7f1d1d" : "1px solid #2a1f4a" }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}><div style={{ fontSize: 10, color: "#7c6fa0", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><span style={{ fontSize: 20 }}>{k.icon}</span></div>
-            <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><span style={{ fontSize: 20 }}>{k.icon}</span></div>
+            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div>
           </div>
         ))}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {day.dayTurnos.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#475569", padding: 28 }}>No hay registros de caja para este día.</div> : day.dayTurnos.map(({ turnoLabel, caja, tI, tC, totalBajas, totalBonos, mov, empleado }) => (
+        {day.dayTurnos.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#64748b", padding: 28 }}>No hay registros de caja para este día.</div> : day.dayTurnos.map(({ turnoLabel, caja, tI, tC, totalBajas, totalBonos, mov, empleado }) => (
           <div key={caja?.turno_id || turnoLabel} style={{ ...S.card }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div><span style={{ fontWeight: 700, color: "#9f67ff", fontSize: 14 }}>{turnoLabel}</span>{empleado && <span style={{ fontSize: 12, color: "#475569", marginLeft: 10 }}>· 👤 {empleado}</span>}</div>
-              <div style={{ fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171", fontSize: 18 }}>{fmt(mov)}</div>
+              <div><span style={{ fontWeight: 700, color: "#a78bfa", fontSize: 14 }}>{turnoLabel}</span>{empleado && <span style={{ fontSize: 12, color: "#64748b", marginLeft: 10 }}>· 👤 {empleado}</span>}</div>
+              <div style={{ fontWeight: 800, color: mov >= 0 ? "#10b981" : "#f43f5e", fontSize: 18 }}>{fmt(mov)}</div>
             </div>
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 12 }}>
-              {[{ label: "Apertura", v: tI, c: "#38bdf8" }, { label: "Cierre", v: tC, c: "#f87171" }].map(x => (<div key={x.label}><div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div><div style={{ color: x.c, fontWeight: 700, fontSize: 13 }}>{fmt(x.v)}</div></div>))}
-              {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ color: "#fbbf24", fontWeight: 700, fontSize: 13 }}>+{fmt(totalBajas)}</div></div>}
-              {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>-{fmt(totalBonos)}</div></div>}
+              {[{ label: "Apertura", v: tI, c: "#38bdf8" }, { label: "Cierre", v: tC, c: "#f43f5e" }].map(x => (<div key={x.label}><div style={{ fontSize: 10, color: "#64748b" }}>{x.label}</div><div style={{ color: x.c, fontWeight: 700, fontSize: 13 }}>{fmt(x.v)}</div></div>))}
+              {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#64748b" }}>Bajas</div><div style={{ color: "#f59e0b", fontWeight: 700, fontSize: 13 }}>+{fmt(totalBajas)}</div></div>}
+              {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#64748b" }}>Bonos</div><div style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>-{fmt(totalBonos)}</div></div>}
               {caja?.comentario_dueno && <div style={{ width: "100%" }}><div style={{ fontSize: 11, color: "#f59e0b", fontStyle: "italic" }}>💬 {caja.comentario_dueno}</div></div>}
             </div>
           </div>
@@ -867,13 +884,13 @@ const DiaSummary = ({ day, fmt }) => {
       </div>
       {day.dayTurnos.some(t => t.exists) && (
         <div style={{ ...S.card, marginTop: 16, background: alertDay ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (alertDay ? "#7f1d1d" : "#14532d") }}>
-          <div style={{ fontSize: 12, color: alertDay ? "#f87171" : "#4ade80", fontWeight: 600, marginBottom: 12 }}>Totales del día</div>
+          <div style={{ fontSize: 12, color: alertDay ? "#f43f5e" : "#10b981", fontWeight: 600, marginBottom: 12 }}>Totales del día</div>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {day.panelNeto !== null && <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Panel neto</div><div style={{ fontSize: 20, fontWeight: 800, color: "#a78bfa" }}>{fmt(day.panelNeto)}</div></div>}
-            <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Caja real</div><div style={{ fontSize: 20, fontWeight: 800, color: day.totalMov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(day.totalMov)}</div></div>
-            {day.dif !== null && <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Diferencia</div><div style={{ fontSize: 20, fontWeight: 800, color: alertDay ? "#f87171" : "#4ade80" }}>{day.dif > 0 ? "+" : ""}{fmt(day.dif)}</div></div>}
+            {day.panelNeto !== null && <div><div style={{ fontSize: 10, color: "#6b7280" }}>Panel neto</div><div style={{ fontSize: 20, fontWeight: 800, color: "#a78bfa" }}>{fmt(day.panelNeto)}</div></div>}
+            <div><div style={{ fontSize: 10, color: "#6b7280" }}>Caja real</div><div style={{ fontSize: 20, fontWeight: 800, color: day.totalMov >= 0 ? "#10b981" : "#f43f5e" }}>{fmt(day.totalMov)}</div></div>
+            {day.dif !== null && <div><div style={{ fontSize: 10, color: "#6b7280" }}>Diferencia</div><div style={{ fontSize: 20, fontWeight: 800, color: alertDay ? "#f43f5e" : "#10b981" }}>{day.dif > 0 ? "+" : ""}{fmt(day.dif)}</div></div>}
           </div>
-          {alertDay && <div style={{ marginTop: 10, fontSize: 13, color: "#f87171", fontWeight: 600 }}>La caja no cierra con el panel</div>}
+          {alertDay && <div style={{ marginTop: 10, fontSize: 13, color: "#f43f5e", fontWeight: 600 }}>La caja no cierra con el panel</div>}
         </div>
       )}
     </>
@@ -896,16 +913,16 @@ const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, ca
   const al = dif !== null && Math.abs(dif) > 100;
   return (
     <div style={{ background: al ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (al ? "#7f1d1d" : "#14532d"), borderRadius: 14, padding: "14px 18px" }}>
-      <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>Resumen del turno</div>
+      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>Resumen del turno</div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <div><div style={{ fontSize: 10, color: "#475569" }}>Mov.</div><div style={{ fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#4ade80" : "#f87171" }}>{fmt(tC - tI)}</div></div>
-        {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>+{fmt(totalBajas)}</div></div>}
-        {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}
-        <div><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(mov)}</div></div>
-        {pn !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Esperado</div><div style={{ fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}
-        {dif !== null && <div><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ fontSize: 18, fontWeight: 800, color: al ? "#f87171" : "#4ade80" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}
+        <div><div style={{ fontSize: 10, color: "#64748b" }}>Mov.</div><div style={{ fontSize: 18, fontWeight: 800, color: tC - tI >= 0 ? "#10b981" : "#f43f5e" }}>{fmt(tC - tI)}</div></div>
+        {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#64748b" }}>Bajas</div><div style={{ fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>+{fmt(totalBajas)}</div></div>}
+        {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#64748b" }}>Bonos</div><div style={{ fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>-{fmt(totalBonos)}</div></div>}
+        <div><div style={{ fontSize: 10, color: "#64748b" }}>Real</div><div style={{ fontSize: 18, fontWeight: 800, color: mov >= 0 ? "#10b981" : "#f43f5e" }}>{fmt(mov)}</div></div>
+        {pn !== null && <div><div style={{ fontSize: 10, color: "#64748b" }}>Esperado</div><div style={{ fontSize: 18, fontWeight: 800, color: "#a78bfa" }}>{fmt(pn)}</div></div>}
+        {dif !== null && <div><div style={{ fontSize: 10, color: "#64748b" }}>Diferencia</div><div style={{ fontSize: 18, fontWeight: 800, color: al ? "#f43f5e" : "#10b981" }}>{dif > 0 ? "+" : ""}{fmt(dif)}</div></div>}
       </div>
-      {al && <div style={{ marginTop: 8, fontSize: 12, color: "#f87171" }}>Diferencia significativa</div>}
+      {al && <div style={{ marginTop: 8, fontSize: 12, color: "#f43f5e" }}>Diferencia significativa</div>}
     </div>
   );
 };
@@ -1218,7 +1235,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const totalBonosGeneral = todosBonos.reduce((s, b) => s + (+b.monto || 0), 0);
   const rankingEmpleados = empleados.map(emp => { const empCajas = cajaHistorial.filter(c => c.empleado_nombre === emp.nombre); const difNeg = empCajas.filter(c => (c.dif || 0) < -100).length; const difTotal = empCajas.reduce((s, c) => s + Math.abs(c.dif || 0), 0); const totalBonos = todosBonos.filter(b => b.empleado === emp.nombre).reduce((s, b) => s + (+b.monto || 0), 0); return { ...emp, turnos: empCajas.length, difNeg, difTotal, totalBonos }; }).filter(e => e.turnos > 0).sort((a, b) => b.difTotal - a.difTotal);
 
-  if (!config) return <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 36 }}>🎰</div>Cargando...</div></div>;
+  if (!config) return <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 36 }}>🎰</div>Cargando...</div></div>;
 
   const tabs = [
     { id: "resumen", label: "📊 Resumen" }, { id: "dia", label: "📅 Día" },
@@ -1238,13 +1255,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
     return (
       <div style={S.card}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600 }}>📤 Bajas del turno</div>
-          <button onClick={add} style={{ background: "#1c1200", border: "1px solid #92400e", color: "#fbbf24", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
+          <div style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>📤 Bajas del turno</div>
+          <button onClick={add} style={{ background: "#1c1200", border: "1px solid #92400e", color: "#f59e0b", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
         </div>
-        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Sin bajas</div> : (
+        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>Sin bajas</div> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {items.map(item => { const dest = destinos.find(d => d.id === item.destinoId); return (
-              <div key={item.id} style={{ background: "#0a0a0f", border: "1px solid #92400e", borderRadius: 10, padding: "12px 14px" }}>
+              <div key={item.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid #92400e", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <div><label style={S.label}>Billetera</label><select value={item.billeteraId} onChange={e => upd(item.id, "billeteraId", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px", appearance: "none" }}><option value="">—</option>{bills.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
                   <div><label style={S.label}>Destino</label><select value={item.destinoId} onChange={e => upd(item.id, "destinoId", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px", appearance: "none" }}><option value="">—</option>{destinos.map(d => <option key={d.id} value={d.id}>{d.alias}</option>)}</select></div>
@@ -1252,10 +1269,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   <button onClick={() => del(item.id)} style={{ ...S.danger, alignSelf: "flex-end" }}>🗑️</button>
                 </div>
                 <div style={{ marginTop: 8 }}><input type="text" value={item.nota || ""} placeholder="Nota..." onChange={e => upd(item.id, "nota", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "7px 10px" }} /></div>
-                {dest && <div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 6 }}>🏦 {dest.titular} · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{dest.cbu}</span></div>}
+                {dest && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>🏦 {dest.titular} · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{dest.cbu}</span></div>}
               </div>
             ); })}
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#7c6fa0" }}>Total bajas</span><span style={{ color: "#fbbf24", fontWeight: 700 }}>{fmt(total)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#6b7280" }}>Total bajas</span><span style={{ color: "#f59e0b", fontWeight: 700 }}>{fmt(total)}</span></div>
           </div>
         )}
       </div>
@@ -1272,12 +1289,12 @@ const OwnerDashboard = ({ session, onLogout }) => {
       <div style={S.card}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 600 }}>🎁 Bonos entregados</div>
-          <button onClick={add} style={{ background: "#1a0533", border: "1px solid #7c3aed", color: "#c084fc", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
+          <button onClick={add} style={{ background: "rgba(124,58,237,0.1)", border: "1px solid #7c3aed", color: "#c4b5fd", padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>+ Agregar</button>
         </div>
-        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Sin bonos</div> : (
+        {items.length === 0 ? <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>Sin bonos</div> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {items.map(item => (
-              <div key={item.id} style={{ background: "#0a0a0f", border: "1px solid #4c1d95", borderRadius: 10, padding: "12px 14px" }}>
+              <div key={item.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid #4c1d95", borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <div><label style={S.label}>Jugador</label><input type="text" value={item.jugador} onChange={e => upd(item.id, "jugador", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
                   <div><label style={S.label}>Monto ($)</label><input type="number" value={item.monto} placeholder="0" onChange={e => upd(item.id, "monto", e.target.value)} style={{ ...S.input, fontSize: 12, padding: "8px 10px" }} /></div>
@@ -1286,7 +1303,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 </div>
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#7c6fa0" }}>Total bonos</span><span style={{ color: "#a78bfa", fontWeight: 700 }}>{fmt(total)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: "#6b7280" }}>Total bonos</span><span style={{ color: "#a78bfa", fontWeight: 700 }}>{fmt(total)}</span></div>
           </div>
         )}
       </div>
@@ -1295,36 +1312,36 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
   return (
     <div style={S.page}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
       {toast && <div style={{ position: "fixed", top: 20, right: 20, background: "#1e1b3a", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 20px", fontSize: 14, zIndex: 9999, maxWidth: 320 }}>{toast}</div>}
 
-      <div style={{ background: "linear-gradient(135deg,#1a0533,#0d1b3e)", borderBottom: "1px solid #1e1e38", padding: "16px 24px 0" }}>
+      <div style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(8,6,18,0.9))", borderBottom: "1px solid #1e1e38", padding: "16px 24px 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🎰</div><h1 style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, background: "linear-gradient(90deg,#c084fc,#818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{config.nombre}</h1></div>
-            <p style={{ margin: "2px 0 0 42px", fontSize: 11, color: "#475569" }}>Seguimiento operativo · {totalPlayers} jugadores</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🎰</div><h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, background: "linear-gradient(90deg,#c084fc,#818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{config.nombre}</h1></div>
+            <p style={{ margin: "2px 0 0 42px", fontSize: 11, color: "#64748b" }}>Seguimiento operativo · {totalPlayers} jugadores</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ fontSize: 11, color: "#9f67ff", fontWeight: 600, textTransform: "capitalize" }}>{monthLabel()}</div>
+            <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 600, textTransform: "capitalize" }}>{monthLabel()}</div>
             <div style={{ position: "relative" }}>
-              <button onClick={() => { setShowNotif(!showNotif); if (!showNotif) db.marcarTodasLeidas(tid).then(() => setNotificaciones(n => n.map(x => ({ ...x, leida: true })))); }} style={{ position: "relative", background: "transparent", border: "1px solid #1e1e38", color: "#475569", padding: "7px 11px", borderRadius: 9, cursor: "pointer", fontSize: 15 }}>
+              <button onClick={() => { setShowNotif(!showNotif); if (!showNotif) db.marcarTodasLeidas(tid).then(() => setNotificaciones(n => n.map(x => ({ ...x, leida: true })))); }} style={{ position: "relative", background: "transparent", border: "1px solid #1e1e38", color: "#64748b", padding: "7px 11px", borderRadius: 9, cursor: "pointer", fontSize: 15 }}>
                 🔔
                 {notificaciones.filter(n => !n.leida).length > 0 && (
-                  <span style={{ position: "absolute", top: -4, right: -4, background: "#f87171", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{notificaciones.filter(n => !n.leida).length}</span>
+                  <span style={{ position: "absolute", top: -4, right: -4, background: "#f43f5e", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{notificaciones.filter(n => !n.leida).length}</span>
                 )}
               </button>
               {showNotif && (
-                <div style={{ position: "absolute", right: 0, top: 44, width: 340, background: "#0e0e1a", border: "1px solid #1e1e38", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 1000, maxHeight: 400, overflowY: "auto" }}>
+                <div style={{ position: "absolute", right: 0, top: 44, width: 340, background: "rgba(15,13,31,0.85)", border: "1px solid #1e1e38", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 1000, maxHeight: 400, overflowY: "auto" }}>
                   <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e1e38", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9" }}>🔔 Notificaciones</span>
-                    <button onClick={() => setShowNotif(false)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 16 }}>✕</button>
+                    <button onClick={() => setShowNotif(false)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 16 }}>✕</button>
                   </div>
                   {notificaciones.length === 0 ? (
-                    <div style={{ padding: 24, textAlign: "center", color: "#475569", fontSize: 13 }}>Sin notificaciones</div>
+                    <div style={{ padding: 24, textAlign: "center", color: "#64748b", fontSize: 13 }}>Sin notificaciones</div>
                   ) : (
                     notificaciones.map(n => (
                       <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid #0a0a14", background: n.leida ? "transparent" : "rgba(124,58,237,0.05)" }}>
-                        <div style={{ fontSize: 12, color: n.leida ? "#475569" : "#f1f5f9", fontWeight: n.leida ? 400 : 600 }}>{n.mensaje}</div>
+                        <div style={{ fontSize: 12, color: n.leida ? "#64748b" : "#f1f5f9", fontWeight: n.leida ? 400 : 600 }}>{n.mensaje}</div>
                         <div style={{ fontSize: 10, color: "#374151", marginTop: 4 }}>{new Date(n.created_at).toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
                       </div>
                     ))
@@ -1336,7 +1353,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
           </div>
         </div>
         <div style={{ display: "flex", gap: 2, overflowX: "auto" }}>
-          {tabs.map(t => <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ padding: "8px 11px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 500, borderRadius: "8px 8px 0 0", whiteSpace: "nowrap", background: activeTab === t.id ? "#07070f" : "transparent", color: activeTab === t.id ? "#9f67ff" : "#475569", borderBottom: activeTab === t.id ? "2px solid #9f67ff" : "2px solid transparent" }}>{t.label}</button>)}
+          {tabs.map(t => <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ padding: "8px 11px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 500, borderRadius: "8px 8px 0 0", whiteSpace: "nowrap", background: activeTab === t.id ? "#080612" : "transparent", color: activeTab === t.id ? "#a78bfa" : "#64748b", borderBottom: activeTab === t.id ? "2px solid #9f67ff" : "2px solid transparent" }}>{t.label}</button>)}
         </div>
       </div>
 
@@ -1345,38 +1362,38 @@ const OwnerDashboard = ({ session, onLogout }) => {
         {activeTab === "resumen" && (
           <div>
             {cmDias > 0 && pmDias > 0 && (
-              <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 12, fontSize: 12, color: "#9f67ff" }}>
+              <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "8px 14px", marginBottom: 12, fontSize: 12, color: "#a78bfa" }}>
                 📊 Comparando <strong>{cmDias} días</strong> de este mes vs el equivalente proporcional del mes anterior ({pmDias} días totales)
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 14 }}>
-              <StatCard icon="💰" label="Cargas del Mes" value={fmt(cmC)} trend={pct(cmC, pmCProp)} color="#4ade80" />
-              <StatCard icon="💸" label="Retiros del Mes" value={fmt(cmR)} trend={pct(cmR, pmRProp)} color="#f87171" />
-              <StatCard icon="📊" label="Neto del Mes" value={fmt(cmN)} trend={pct(cmN, pmNProp)} color={cmN >= 0 ? "#4ade80" : "#f87171"} />
+              <StatCard icon="💰" label="Cargas del Mes" value={fmt(cmC)} trend={pct(cmC, pmCProp)} color="#10b981" />
+              <StatCard icon="💸" label="Retiros del Mes" value={fmt(cmR)} trend={pct(cmR, pmRProp)} color="#f43f5e" />
+              <StatCard icon="📊" label="Neto del Mes" value={fmt(cmN)} trend={pct(cmN, pmNProp)} color={cmN >= 0 ? "#10b981" : "#f43f5e"} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
-              <StatCard icon="🆕" label="Jugadores Nuevos" value={cmNuevos} trend={pct(cmNuevos, pmNuevos)} color="#fbbf24" />
+              <StatCard icon="🆕" label="Jugadores Nuevos" value={cmNuevos} trend={pct(cmNuevos, pmNuevos)} color="#f59e0b" />
               <StatCard icon="👥" label="Jugadores Activos" value={cmUnicos} trend={pct(cmUnicos, pmUnicos)} color="#38bdf8" />
-              <StatCard icon="⚠️" label="Alertas de Caja" value={alertas.length} color={alertas.length > 0 ? "#f87171" : "#4ade80"} sub={alertas.length > 0 ? "diferencias detectadas" : "sin diferencias"} onClick={() => setActiveTab("caja")} />
+              <StatCard icon="⚠️" label="Alertas de Caja" value={alertas.length} color={alertas.length > 0 ? "#f43f5e" : "#10b981"} sub={alertas.length > 0 ? "diferencias detectadas" : "sin diferencias"} onClick={() => setActiveTab("caja")} />
             </div>
-            {(() => { const t = entries.find(e => e.fecha === todayStr()); return (<div style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.08),rgba(6,182,212,0.04))", border: "1px solid #1e1e38", borderRadius: 16, padding: "14px 20px", marginBottom: 20 }}><div style={{ fontSize: 11, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, fontWeight: 700 }}>📅 Hoy</div>{t ? (<div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>{[{ label: "Cargas", v: t.cargas, c: "#4ade80" }, { label: "Retiros", v: t.retiros, c: "#f87171" }, { label: "Neto", v: t.cargas - t.retiros, c: t.cargas - t.retiros >= 0 ? "#4ade80" : "#f87171" }].map(x => (<div key={x.label}><div style={{ fontSize: 11, color: "#475569" }}>{x.label}</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, color: x.c, fontWeight: 800 }}>{fmt(x.v)}</div></div>))}</div>) : (<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ color: "#475569", fontSize: 13 }}>No hay datos para hoy</span><button onClick={() => setActiveTab("importar")} style={{ ...S.btn, padding: "7px 14px", fontSize: 12 }}>📂 Importar</button></div>)}</div>); })()}
+            {(() => { const t = entries.find(e => e.fecha === todayStr()); return (<div style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.08),rgba(6,182,212,0.04))", border: "1px solid #1e1e38", borderRadius: 16, padding: "14px 20px", marginBottom: 20 }}><div style={{ fontSize: 11, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, fontWeight: 700 }}>📅 Hoy</div>{t ? (<div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>{[{ label: "Cargas", v: t.cargas, c: "#10b981" }, { label: "Retiros", v: t.retiros, c: "#f43f5e" }, { label: "Neto", v: t.cargas - t.retiros, c: t.cargas - t.retiros >= 0 ? "#10b981" : "#f43f5e" }].map(x => (<div key={x.label}><div style={{ fontSize: 11, color: "#64748b" }}>{x.label}</div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, color: x.c, fontWeight: 800 }}>{fmt(x.v)}</div></div>))}</div>) : (<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ color: "#64748b", fontSize: 13 }}>No hay datos para hoy</span><button onClick={() => setActiveTab("importar")} style={{ ...S.btn, padding: "7px 14px", fontSize: 12 }}>📂 Importar</button></div>)}</div>); })()}
             {chartData.length > 0 ? (<>
-              <div style={{ ...S.card, marginBottom: 14 }}><div style={{ fontSize: 13, color: "#38bdf8", marginBottom: 14, fontWeight: 700 }}>Últimos 7 días</div><ResponsiveContainer width="100%" height={200}><BarChart data={last7}><CartesianGrid strokeDasharray="3 3" stroke="#1e1e38" /><XAxis dataKey="dia" tick={{ fill: "#475569", fontSize: 11 }} /><YAxis tick={{ fill: "#475569", fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} /><Tooltip contentStyle={{ background: "#1e1b3a", border: "1px solid #1e1e38", borderRadius: 10 }} formatter={v => fmt(v)} /><Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="Cargas" fill="#4ade80" radius={[5, 5, 0, 0]} /><Bar dataKey="Retiros" fill="#f87171" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer></div>
-              <div style={{ ...S.card, marginBottom: 14 }}><div style={{ fontSize: 13, color: "#a78bfa", marginBottom: 14, fontWeight: 700, textTransform: "capitalize" }}>Evolución — {monthLabel()}</div><ResponsiveContainer width="100%" height={220}><AreaChart data={chartData}><defs><linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.3} /><stop offset="95%" stopColor="#4ade80" stopOpacity={0} /></linearGradient><linearGradient id="gR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.3} /><stop offset="95%" stopColor="#f87171" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="#1e1e38" /><XAxis dataKey="dia" tick={{ fill: "#475569", fontSize: 11 }} /><YAxis tick={{ fill: "#475569", fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} /><Tooltip contentStyle={{ background: "#1e1b3a", border: "1px solid #1e1e38", borderRadius: 10 }} formatter={v => fmt(v)} /><Legend wrapperStyle={{ fontSize: 11 }} /><Area type="monotone" dataKey="Cargas" stroke="#4ade80" fill="url(#gC)" strokeWidth={2} dot={false} /><Area type="monotone" dataKey="Retiros" stroke="#f87171" fill="url(#gR)" strokeWidth={2} dot={false} /></AreaChart></ResponsiveContainer></div>
+              <div style={{ ...S.card, marginBottom: 14 }}><div style={{ fontSize: 13, color: "#38bdf8", marginBottom: 14, fontWeight: 700 }}>Últimos 7 días</div><ResponsiveContainer width="100%" height={200}><BarChart data={last7}><CartesianGrid strokeDasharray="3 3" stroke="rgba(124,58,237,0.15)" /><XAxis dataKey="dia" tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} /><Tooltip contentStyle={{ background: "rgba(15,13,31,0.95)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10 }} formatter={v => fmt(v)} /><Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="Cargas" fill="#10b981" radius={[5, 5, 0, 0]} /><Bar dataKey="Retiros" fill="#f43f5e" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer></div>
+              <div style={{ ...S.card, marginBottom: 14 }}><div style={{ fontSize: 13, color: "#a78bfa", marginBottom: 14, fontWeight: 700, textTransform: "capitalize" }}>Evolución — {monthLabel()}</div><ResponsiveContainer width="100%" height={220}><AreaChart data={chartData}><defs><linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient><linearGradient id="gR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} /><stop offset="95%" stopColor="#f43f5e" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="rgba(124,58,237,0.15)" /><XAxis dataKey="dia" tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} /><Tooltip contentStyle={{ background: "rgba(15,13,31,0.95)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10 }} formatter={v => fmt(v)} /><Legend wrapperStyle={{ fontSize: 11 }} /><Area type="monotone" dataKey="Cargas" stroke="#10b981" fill="url(#gC)" strokeWidth={2} dot={false} /><Area type="monotone" dataKey="Retiros" stroke="#f43f5e" fill="url(#gR)" strokeWidth={2} dot={false} /></AreaChart></ResponsiveContainer></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div style={S.card}><div style={{ fontSize: 13, color: "#a78bfa", marginBottom: 12, fontWeight: 700 }}>Comparativa financiera</div><ResponsiveContainer width="100%" height={160}><BarChart data={compareData}><CartesianGrid strokeDasharray="3 3" stroke="#1e1e38" /><XAxis dataKey="name" tick={{ fill: "#475569", fontSize: 11 }} /><YAxis tick={{ fill: "#475569", fontSize: 10 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} /><Tooltip contentStyle={{ background: "#1e1b3a", border: "1px solid #1e1e38", borderRadius: 10 }} formatter={v => fmt(v)} /><Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="Anterior" fill="#4c1d95" radius={[4, 4, 0, 0]} /><Bar dataKey="Actual" fill="#7c3aed" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
-                <div style={S.card}><div style={{ fontSize: 13, color: "#fbbf24", marginBottom: 12, fontWeight: 700 }}>Comparativa jugadores</div><ResponsiveContainer width="100%" height={160}><BarChart data={[{ name: "Nuevos", Anterior: pmNuevos, Actual: cmNuevos }, { name: "Activos", Anterior: pmUnicos, Actual: cmUnicos }]}><CartesianGrid strokeDasharray="3 3" stroke="#1e1e38" /><XAxis dataKey="name" tick={{ fill: "#475569", fontSize: 11 }} /><YAxis tick={{ fill: "#475569", fontSize: 10 }} allowDecimals={false} /><Tooltip contentStyle={{ background: "#1e1b3a", border: "1px solid #1e1e38", borderRadius: 10 }} /><Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="Anterior" fill="#78350f" radius={[4, 4, 0, 0]} /><Bar dataKey="Actual" fill="#d97706" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
+                <div style={S.card}><div style={{ fontSize: 13, color: "#a78bfa", marginBottom: 12, fontWeight: 700 }}>Comparativa financiera</div><ResponsiveContainer width="100%" height={160}><BarChart data={compareData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(124,58,237,0.15)" /><XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} /><Tooltip contentStyle={{ background: "rgba(15,13,31,0.95)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10 }} formatter={v => fmt(v)} /><Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="Anterior" fill="#5b21b6" radius={[4, 4, 0, 0]} /><Bar dataKey="Actual" fill="#7c3aed" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
+                <div style={S.card}><div style={{ fontSize: 13, color: "#f59e0b", marginBottom: 12, fontWeight: 700 }}>Comparativa jugadores</div><ResponsiveContainer width="100%" height={160}><BarChart data={[{ name: "Nuevos", Anterior: pmNuevos, Actual: cmNuevos }, { name: "Activos", Anterior: pmUnicos, Actual: cmUnicos }]}><CartesianGrid strokeDasharray="3 3" stroke="rgba(124,58,237,0.15)" /><XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 11 }} /><YAxis tick={{ fill: "#64748b", fontSize: 10 }} allowDecimals={false} /><Tooltip contentStyle={{ background: "rgba(15,13,31,0.95)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10 }} /><Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="Anterior" fill="#78350f" radius={[4, 4, 0, 0]} /><Bar dataKey="Actual" fill="#d97706" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
               </div>
-            </>) : (<div style={{ textAlign: "center", padding: "50px 0", color: "#475569" }}><div style={{ fontSize: 44, marginBottom: 12 }}>📊</div><div>Importá tus CSVs desde <strong style={{ color: "#9f67ff" }}>📂 Importar</strong></div></div>)}
+            </>) : (<div style={{ textAlign: "center", padding: "50px 0", color: "#64748b" }}><div style={{ fontSize: 44, marginBottom: 12 }}>📊</div><div>Importá tus CSVs desde <strong style={{ color: "#a78bfa" }}>📂 Importar</strong></div></div>)}
           </div>
         )}
 
         {activeTab === "dia" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-              <div><h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#c084fc" }}>📅 Resumen del Día</h2></div>
+              <div><h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#c4b5fd" }}>📅 Resumen del Día</h2></div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                {[...new Set([...cajas.map(c => c.fecha), ...entries.map(e => e.fecha)])].sort((a, b) => b.localeCompare(a)).slice(0, 5).map(d => (<button key={d} onClick={() => setSelectedDay(d)} style={{ padding: "7px 12px", border: "1px solid " + (selectedDay === d ? "#7c3aed" : "#2a1f4a"), borderRadius: 8, background: selectedDay === d ? "#2d1b69" : "#0a0a0f", color: selectedDay === d ? "#c084fc" : "#7c6fa0", cursor: "pointer", fontSize: 11, fontWeight: selectedDay === d ? 700 : 400 }}>{new Date(d + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</button>))}
+                {[...new Set([...cajas.map(c => c.fecha), ...entries.map(e => e.fecha)])].sort((a, b) => b.localeCompare(a)).slice(0, 5).map(d => (<button key={d} onClick={() => setSelectedDay(d)} style={{ padding: "7px 12px", border: "1px solid " + (selectedDay === d ? "#7c3aed" : "rgba(124,58,237,0.2)"), borderRadius: 8, background: selectedDay === d ? "rgba(124,58,237,0.2)" : "rgba(8,6,18,0.9)", color: selectedDay === d ? "#c4b5fd" : "#6b7280", cursor: "pointer", fontSize: 11, fontWeight: selectedDay === d ? 700 : 400 }}>{new Date(d + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</button>))}
                 <input type="date" value={selectedDay} onChange={e => setSelectedDay(e.target.value)} style={{ ...S.input, width: "auto", padding: "7px 12px", fontSize: 12 }} />
               </div>
             </div>
@@ -1387,13 +1404,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
         {activeTab === "caja" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <h2 style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#9f67ff" }}>💼 Control de Caja</h2>
+              <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>💼 Control de Caja</h2>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setCajaTab("cargar")} style={{ padding: "9px 16px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: cajaTab === "cargar" ? 700 : 500, borderRadius: "8px 8px 0 0", background: cajaTab === "cargar" ? C.bg : "transparent", color: cajaTab === "cargar" ? "#9f67ff" : "#475569", borderBottom: cajaTab === "cargar" ? "2px solid #9f67ff" : "2px solid transparent" }}>Cargar turno</button>
-                <button onClick={() => setCajaTab("historial")} style={{ padding: "9px 16px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: cajaTab === "historial" ? 700 : 500, borderRadius: "8px 8px 0 0", background: cajaTab === "historial" ? C.bg : "transparent", color: cajaTab === "historial" ? "#9f67ff" : "#475569", borderBottom: cajaTab === "historial" ? "2px solid #9f67ff" : "2px solid transparent" }}>Historial</button>
+                <button onClick={() => setCajaTab("cargar")} style={{ padding: "9px 16px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: cajaTab === "cargar" ? 700 : 500, borderRadius: "8px 8px 0 0", background: cajaTab === "cargar" ? C.bg : "transparent", color: cajaTab === "cargar" ? "#a78bfa" : "#64748b", borderBottom: cajaTab === "cargar" ? "2px solid #9f67ff" : "2px solid transparent" }}>Cargar turno</button>
+                <button onClick={() => setCajaTab("historial")} style={{ padding: "9px 16px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: cajaTab === "historial" ? 700 : 500, borderRadius: "8px 8px 0 0", background: cajaTab === "historial" ? C.bg : "transparent", color: cajaTab === "historial" ? "#a78bfa" : "#64748b", borderBottom: cajaTab === "historial" ? "2px solid #9f67ff" : "2px solid transparent" }}>Historial</button>
               </div>
             </div>
-            {alertas.length > 0 && <div style={{ background: "linear-gradient(135deg,#2d0a0a,#1a0a00)", border: "1px solid #7f1d1d", borderRadius: 14, padding: "14px 18px", marginBottom: 20 }}><div style={{ fontSize: 12, color: "#f87171", fontWeight: 700, marginBottom: 10 }}>⚠️ {alertas.length} diferencia{alertas.length > 1 ? "s" : ""} detectada{alertas.length > 1 ? "s" : ""}</div>{alertas.map(c => (<div key={c.fecha + c.turno_id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d0a0a", fontSize: 12 }}><span><span style={{ color: "#fca5a5" }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</span><span style={{ color: "#475569", marginLeft: 8 }}>{c.turnoLabel} · {c.empleado_nombre}</span></span><span style={{ color: c.dif < 0 ? "#f87171" : "#fbbf24", fontWeight: 700 }}>{c.dif < 0 ? "Falta " : "Sobra "}{fmt(Math.abs(c.dif))}</span></div>))}</div>}
+            {alertas.length > 0 && <div style={{ background: "linear-gradient(135deg,#2d0a0a,#1a0a00)", border: "1px solid #7f1d1d", borderRadius: 14, padding: "14px 18px", marginBottom: 20 }}><div style={{ fontSize: 12, color: "#f43f5e", fontWeight: 700, marginBottom: 10 }}>⚠️ {alertas.length} diferencia{alertas.length > 1 ? "s" : ""} detectada{alertas.length > 1 ? "s" : ""}</div>{alertas.map(c => (<div key={c.fecha + c.turno_id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d0a0a", fontSize: 12 }}><span><span style={{ color: "#fca5a5" }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</span><span style={{ color: "#64748b", marginLeft: 8 }}>{c.turnoLabel} · {c.empleado_nombre}</span></span><span style={{ color: c.dif < 0 ? "#f43f5e" : "#f59e0b", fontWeight: 700 }}>{c.dif < 0 ? "Falta " : "Sobra "}{fmt(Math.abs(c.dif))}</span></div>))}</div>}
 
             {cajaTab === "cargar" && (
               <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 20 }}>
@@ -1401,12 +1418,12 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 14 }}>Datos del turno</div>
                   <div style={{ marginBottom: 12 }}><label style={S.label}>Fecha</label><input type="date" value={cajaForm.date} onChange={e => setCajaForm({ ...cajaForm, date: e.target.value })} style={S.input} /></div>
                   <div style={{ marginBottom: 12 }}><label style={S.label}>Empleado</label>
-                    {empleados.filter(e => e.activo).length > 0 ? (<select value={cajaForm.empleado} onChange={e => setCajaForm({ ...cajaForm, empleado: e.target.value, inicio: {}, cierre: {} })} style={{ ...S.input, appearance: "none" }}><option value="">— Seleccioná —</option>{empleados.filter(e => e.activo).map(e => <option key={e.id} value={e.nombre}>{e.nombre}{e.horario_inicio ? ` (${e.horario_inicio}${e.horario_fin ? " – " + e.horario_fin : ""})` : ""}</option>)}</select>) : (<button onClick={() => { setActiveTab("ajustes"); setSettingsTab("empleados"); }} style={{ width: "100%", background: "#0e0e1a", border: "1px dashed #4c1d95", color: "#a78bfa", padding: "10px", borderRadius: 10, cursor: "pointer", fontSize: 12 }}>+ Agregar empleados</button>)}
+                    {empleados.filter(e => e.activo).length > 0 ? (<select value={cajaForm.empleado} onChange={e => setCajaForm({ ...cajaForm, empleado: e.target.value, inicio: {}, cierre: {} })} style={{ ...S.input, appearance: "none" }}><option value="">— Seleccioná —</option>{empleados.filter(e => e.activo).map(e => <option key={e.id} value={e.nombre}>{e.nombre}{e.horario_inicio ? ` (${e.horario_inicio}${e.horario_fin ? " – " + e.horario_fin : ""})` : ""}</option>)}</select>) : (<button onClick={() => { setActiveTab("ajustes"); setSettingsTab("empleados"); }} style={{ width: "100%", background: "rgba(15,13,31,0.85)", border: "1px dashed #4c1d95", color: "#a78bfa", padding: "10px", borderRadius: 10, cursor: "pointer", fontSize: 12 }}>+ Agregar empleados</button>)}
                   </div>
                   {cajaForm.empleado && empleados.find(e => e.nombre === cajaForm.empleado)?.horario_inicio && (
-                    <div style={{ background: "#1a0533", border: "1px solid #4c1d95", borderRadius: 9, padding: "8px 12px", fontSize: 12 }}>
-                      <span style={{ color: "#475569" }}>⏰ </span>
-                      <span style={{ color: "#c084fc", fontWeight: 700 }}>
+                    <div style={{ background: "rgba(124,58,237,0.1)", border: "1px solid #4c1d95", borderRadius: 9, padding: "8px 12px", fontSize: 12 }}>
+                      <span style={{ color: "#64748b" }}>⏰ </span>
+                      <span style={{ color: "#c4b5fd", fontWeight: 700 }}>
                         {empleados.find(e => e.nombre === cajaForm.empleado)?.horario_inicio}
                         {empleados.find(e => e.nombre === cajaForm.empleado)?.horario_fin ? " – " + empleados.find(e => e.nombre === cajaForm.empleado)?.horario_fin : ""}
                       </span>
@@ -1420,7 +1437,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       <button onClick={() => { setEditCajaData(null); setCajaForm({ date: todayStr(), empleado: "", inicio: {}, cierre: {}, bajas: [], bonos: [] }); }} style={{ background: "none", border: "1px solid #4c1d95", color: "#a78bfa", padding: "4px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>✕ Cancelar</button>
                     </div>
                   )}
-                  {[{ label: "🌅 Apertura", fk: "inicio", color: "#38bdf8", ro: true }, { label: "🌆 Cierre", fk: "cierre", color: "#f87171", ro: false }].map(col => (
+                  {[{ label: "🌅 Apertura", fk: "inicio", color: "#38bdf8", ro: true }, { label: "🌆 Cierre", fk: "cierre", color: "#f43f5e", ro: false }].map(col => (
                     <CajaBilleteraCol key={col.fk} col={col} cajaForm={cajaForm} setCajaForm={setCajaForm} bills={bills} empleados={empleados} editCajaData={editCajaData} />
                   ))}
                   <CajaBajas formState={cajaForm} setFormState={setCajaForm} />
@@ -1433,40 +1450,40 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
             {cajaTab === "historial" && (
               <div>
-                {cajaHistorial.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#7c6fa0" }}>No hay registros todavía.</div> : (
+                {cajaHistorial.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>No hay registros todavía.</div> : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {cajaHistorial.map(c => {
                       const isExp = expandedCaja === c.fecha + c.turno_id;
                       const hasDif = Math.abs(c.dif) > 100;
                       const commentKey = c.fecha + c.turno_id;
                       return (
-                        <div key={commentKey} style={{ background: hasDif ? "#1a0808" : C.card, border: "1px solid " + (hasDif ? "#7f1d1d" : C.border), borderRadius: 14 }}>
+                        <div key={commentKey} style={{ background: hasDif ? "rgba(244,63,94,0.06)" : C.card, border: "1px solid " + (hasDif ? "#7f1d1d" : C.border), borderRadius: 14 }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", flexWrap: "wrap", gap: 8 }}>
                             <div onClick={() => setExpandedCaja(isExp ? null : commentKey)} style={{ cursor: "pointer", flex: 1 }}>
                               <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
-                              <span style={{ marginLeft: 10, fontSize: 11, color: "#475569" }}>{c.turnoLabel}</span>
-                              <span style={{ marginLeft: 10, fontSize: 11, color: "#9f67ff" }}>· 👤 {c.empleado_nombre}</span>
+                              <span style={{ marginLeft: 10, fontSize: 11, color: "#64748b" }}>{c.turnoLabel}</span>
+                              <span style={{ marginLeft: 10, fontSize: 11, color: "#a78bfa" }}>· 👤 {c.empleado_nombre}</span>
                             </div>
                             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Real</div><div style={{ color: c.mov >= 0 ? "#4ade80" : "#f87171", fontWeight: 700, fontSize: 13 }}>{fmt(c.mov)}</div></div>
-                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Diferencia</div><div style={{ color: hasDif ? "#f87171" : "#4ade80", fontWeight: 800, fontSize: 14 }}>{c.dif > 0 ? "+" : ""}{fmt(c.dif)}</div></div>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>Real</div><div style={{ color: c.mov >= 0 ? "#10b981" : "#f43f5e", fontWeight: 700, fontSize: 13 }}>{fmt(c.mov)}</div></div>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>Diferencia</div><div style={{ color: hasDif ? "#f43f5e" : "#10b981", fontWeight: 800, fontSize: 14 }}>{c.dif > 0 ? "+" : ""}{fmt(c.dif)}</div></div>
                               <Badge ok={!hasDif} />
                               <button onClick={() => startEditCaja(c)} style={{ background: "#1a1030", border: "1px solid #4c1d95", color: "#a78bfa", padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>✏️</button>
                               <button onClick={() => deleteCajaOwner(c.id)} style={S.danger}>🗑️</button>
-                              <span onClick={() => setExpandedCaja(isExp ? null : commentKey)} style={{ color: "#475569", fontSize: 11, cursor: "pointer" }}>{isExp ? "▲" : "▼"}</span>
+                              <span onClick={() => setExpandedCaja(isExp ? null : commentKey)} style={{ color: "#64748b", fontSize: 11, cursor: "pointer" }}>{isExp ? "▲" : "▼"}</span>
                             </div>
                           </div>
                           {isExp && (
                             <div style={{ padding: "0 18px 16px" }}>
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 12 }}>
-                                {[{ label: "🟢 Apertura", k: "inicio", color: "#38bdf8", total: c.tI }, { label: "🔴 Cierre", k: "cierre", color: "#f87171", total: c.tC }].map(col => (
-                                  <div key={col.k}><div style={{ fontSize: 11, color: col.color, marginBottom: 8 }}>{col.label}</div>{bills.map(b => (<div key={b.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #1a1530" }}><span style={{ color: "#7c6fa0" }}>{b.nombre}</span><span style={{ color: "#e2e8f0" }}>{fmt(c[col.k]?.[b.id] || 0)}</span></div>))}<div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 6, fontWeight: 700 }}><span style={{ color: col.color }}>Total</span><span style={{ color: col.color }}>{fmt(col.total)}</span></div></div>
+                                {[{ label: "🟢 Apertura", k: "inicio", color: "#38bdf8", total: c.tI }, { label: "🔴 Cierre", k: "cierre", color: "#f43f5e", total: c.tC }].map(col => (
+                                  <div key={col.k}><div style={{ fontSize: 11, color: col.color, marginBottom: 8 }}>{col.label}</div>{bills.map(b => (<div key={b.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #1a1530" }}><span style={{ color: "#6b7280" }}>{b.nombre}</span><span style={{ color: "#e2e8f0" }}>{fmt(c[col.k]?.[b.id] || 0)}</span></div>))}<div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 6, fontWeight: 700 }}><span style={{ color: col.color }}>Total</span><span style={{ color: col.color }}>{fmt(col.total)}</span></div></div>
                                 ))}
                               </div>
-                              {(c.bonos || []).length > 0 && <div style={{ marginBottom: 10 }}><div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6 }}>🎁 Bonos</div>{(c.bonos || []).map((b, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #1a1530" }}><span style={{ color: "#7c6fa0" }}>{b.jugador || "—"}{b.nota ? ` · ${b.nota}` : ""}</span><span style={{ color: "#a78bfa", fontWeight: 700 }}>{fmt(+b.monto || 0)}</span></div>))}</div>}
-                              {(c.bajas || []).length > 0 && <div style={{ marginBottom: 10 }}><div style={{ fontSize: 11, color: "#fbbf24", marginBottom: 6 }}>📤 Bajas</div>{(c.bajas || []).map((b, i) => { const bill = bills.find(x => x.id === b.billeteraId); const dest = destinos.find(d => d.id === b.destinoId); return (<div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #1a1530" }}><span style={{ color: "#7c6fa0" }}>{bill?.nombre || "—"}{dest ? ` → ${dest.alias}` : ""}</span><span style={{ color: "#fbbf24", fontWeight: 700 }}>{fmt(+b.monto || 0)}</span></div>); })}</div>}
+                              {(c.bonos || []).length > 0 && <div style={{ marginBottom: 10 }}><div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 6 }}>🎁 Bonos</div>{(c.bonos || []).map((b, i) => (<div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #1a1530" }}><span style={{ color: "#6b7280" }}>{b.jugador || "—"}{b.nota ? ` · ${b.nota}` : ""}</span><span style={{ color: "#a78bfa", fontWeight: 700 }}>{fmt(+b.monto || 0)}</span></div>))}</div>}
+                              {(c.bajas || []).length > 0 && <div style={{ marginBottom: 10 }}><div style={{ fontSize: 11, color: "#f59e0b", marginBottom: 6 }}>📤 Bajas</div>{(c.bajas || []).map((b, i) => { const bill = bills.find(x => x.id === b.billeteraId); const dest = destinos.find(d => d.id === b.destinoId); return (<div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #1a1530" }}><span style={{ color: "#6b7280" }}>{bill?.nombre || "—"}{dest ? ` → ${dest.alias}` : ""}</span><span style={{ color: "#f59e0b", fontWeight: 700 }}>{fmt(+b.monto || 0)}</span></div>); })}</div>}
                               <div style={{ marginTop: 8 }}>
-                                <div style={{ fontSize: 10, color: "#7c6fa0", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>💬 Comentario interno</div>
+                                <div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>💬 Comentario interno</div>
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <input type="text" value={cajaComment[commentKey] !== undefined ? cajaComment[commentKey] : (c.comentario_dueno || "")} placeholder="Nota interna..." onChange={e => setCajaComment({ ...cajaComment, [commentKey]: e.target.value })} style={{ ...S.input, flex: 1, fontSize: 12, padding: "8px 12px" }} />
                                   <button onClick={() => saveComment(c.fecha, c.turno_id, cajaComment[commentKey] !== undefined ? cajaComment[commentKey] : c.comentario_dueno || "")} style={{ ...S.btn, padding: "8px 14px", fontSize: 12 }}>Guardar</button>
@@ -1487,17 +1504,17 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "jugadores" && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#9f67ff" }}>👥 Jugadores</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#a78bfa" }}>👥 Jugadores</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
-              {[{ label: "Nuevos este mes", value: cmNuevos, color: "#fbbf24", icon: "🆕" }, { label: "Nuevos mes pasado", value: pmNuevos, color: "#a78bfa", icon: "📅" }, { label: "Activos este mes", value: cmUnicos, color: "#38bdf8", icon: "🎮" }, { label: "Total historial", value: totalPlayers, color: "#4ade80", icon: "📁" }].map(s => (
-                <div key={s.label} style={S.card}><div style={{ fontSize: 18, marginBottom: 6 }}>{s.icon}</div><div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>{s.label}</div></div>
+              {[{ label: "Nuevos este mes", value: cmNuevos, color: "#f59e0b", icon: "🆕" }, { label: "Nuevos mes pasado", value: pmNuevos, color: "#a78bfa", icon: "📅" }, { label: "Activos este mes", value: cmUnicos, color: "#38bdf8", icon: "🎮" }, { label: "Total historial", value: totalPlayers, color: "#10b981", icon: "📁" }].map(s => (
+                <div key={s.label} style={S.card}><div style={{ fontSize: 18, marginBottom: 6 }}>{s.icon}</div><div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{s.label}</div></div>
               ))}
             </div>
             {(() => {
               const segmentos = [
-                { label: "💪 Cargas fuertes", sub: "+$15.000", seg: "fuerte", color: "#4ade80", border: "rgba(74,222,128,0.25)" },
-                { label: "📊 Cargas medias", sub: "$5.000 – $15.000", seg: "media", color: "#fbbf24", border: "rgba(251,191,36,0.25)" },
-                { label: "🔻 Cargas bajas", sub: "Hasta $5.000", seg: "baja", color: "#f87171", border: "rgba(248,113,113,0.25)" },
+                { label: "💪 Cargas fuertes", sub: "+$15.000", seg: "fuerte", color: "#10b981", border: "rgba(74,222,128,0.25)" },
+                { label: "📊 Cargas medias", sub: "$5.000 – $15.000", seg: "media", color: "#f59e0b", border: "rgba(251,191,36,0.25)" },
+                { label: "🔻 Cargas bajas", sub: "Hasta $5.000", seg: "baja", color: "#f43f5e", border: "rgba(248,113,113,0.25)" },
                 { label: "🔥 Alta frecuencia", sub: "7+ cargas este mes", seg: "frecuente", color: "#a78bfa", border: "rgba(167,139,250,0.25)" },
               ];
               const getCount = (seg) => {
@@ -1515,9 +1532,9 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   {segmentos.map(seg => (
                     <div key={seg.seg} onClick={() => setJugSeg(jugSeg === seg.seg ? null : seg.seg)} style={{ ...S.card, borderColor: jugSeg === seg.seg ? seg.border : C.border, cursor: "pointer", background: jugSeg === seg.seg ? "rgba(255,255,255,0.03)" : C.card }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: seg.color, marginBottom: 4 }}>{seg.label}</div>
-                      <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>{seg.sub}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>{seg.sub}</div>
                       <div style={{ fontSize: 30, fontWeight: 800, color: seg.color }}>{getCount(seg.seg)}</div>
-                      <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>jugadores</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>jugadores</div>
                     </div>
                   ))}
                 </div>
@@ -1526,7 +1543,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
             {jugSeg && (
               <div style={{ ...S.card, marginBottom: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9f67ff" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>
                     {jugSeg === "fuerte" ? "💪 Cargas fuertes (+$15.000)" : jugSeg === "media" ? "📊 Cargas medias ($5.000 – $15.000)" : jugSeg === "baja" ? "🔻 Cargas bajas (hasta $5.000)" : "🔥 Alta frecuencia (5+ días)"}
                   </div>
                   <button onClick={() => setJugSeg(null)} style={S.ghost}>✕ Cerrar</button>
@@ -1540,24 +1557,24 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     const ok = jugSeg === "fuerte" ? stats.max_carga >= 15000 : jugSeg === "media" ? stats.max_carga >= 5000 && stats.max_carga < 15000 : jugSeg === "baja" ? stats.max_carga > 0 && stats.max_carga < 5000 : stats.cant_cargas >= 7;
                     return ok && (!jugFiltro || j.nombre.toLowerCase().includes(jugFiltro.toLowerCase()));
                   });
-                  if (filtrados.length === 0) return <div style={{ color: "#475569", textAlign: "center", padding: 24 }}>No hay jugadores en este segmento todavía.</div>;
+                  if (filtrados.length === 0) return <div style={{ color: "#64748b", textAlign: "center", padding: 24 }}>No hay jugadores en este segmento todavía.</div>;
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {filtrados.map(j => {
                         const stats = getJugStats(j.nombre);
                         return (
-                          <div key={j.nombre} style={{ background: "#0a0a14", border: "1px solid #1e1e38", borderRadius: 12, padding: "13px 16px" }}>
+                          <div key={j.nombre} style={{ background: "rgba(8,6,18,0.7)", border: "1px solid #1e1e38", borderRadius: 12, padding: "13px 16px" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                               <div>
                                 <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {j.nombre}</div>
-                                <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
+                                <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
                                   Primera vez: {j.primera_vez || "—"} · {stats.cant_cargas || 0} carga{(stats.cant_cargas || 0) !== 1 ? "s" : ""} este mes · máx: {fmt(stats.max_carga || 0)}
                                   {j.telefono ? ` · 📱 ${j.telefono}` : ""}
                                 </div>
                               </div>
                               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                                 {j.telefono ? (
-                                  <span style={{ fontSize: 12, color: "#4ade80" }}>📱 {j.telefono}</span>
+                                  <span style={{ fontSize: 12, color: "#10b981" }}>📱 {j.telefono}</span>
                                 ) : (
                                   <input type="text" placeholder="+ teléfono" style={{ ...S.input, width: 130, fontSize: 12, padding: "6px 10px" }}
                                     onBlur={async e => { if (e.target.value) { await supabase.from("jugadores").update({ telefono: e.target.value }).eq("tenant_id", tid).eq("nombre", j.nombre); loadAll(); } }} />
@@ -1574,11 +1591,11 @@ const OwnerDashboard = ({ session, onLogout }) => {
             )}
             {(cmNuevos > 0 || pmNuevos > 0) && (
               <div style={{ ...S.card, marginBottom: 20 }}>
-                <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 14 }}>Nuevos: mes a mes</div>
-                {[{ label: monthLabel(-1), value: pmNuevos, color: "#78350f", tc: "#a78bfa" }, { label: monthLabel(), value: cmNuevos, color: "linear-gradient(90deg,#d97706,#fbbf24)", tc: "#fbbf24" }].map(row => (
+                <div style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600, marginBottom: 14 }}>Nuevos: mes a mes</div>
+                {[{ label: monthLabel(-1), value: pmNuevos, color: "#78350f", tc: "#a78bfa" }, { label: monthLabel(), value: cmNuevos, color: "linear-gradient(90deg,#d97706,#fbbf24)", tc: "#f59e0b" }].map(row => (
                   <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, color: "#475569", width: 90, textTransform: "capitalize", flexShrink: 0 }}>{row.label}</div>
-                    <div style={{ flex: 1, background: "#1e1e38", borderRadius: 100, height: 8 }}><div style={{ background: row.color, borderRadius: 100, height: 8, width: `${Math.max(cmNuevos, pmNuevos) > 0 ? (row.value / Math.max(cmNuevos, pmNuevos)) * 100 : 0}%`, transition: "width 1s ease" }} /></div>
+                    <div style={{ fontSize: 11, color: "#64748b", width: 90, textTransform: "capitalize", flexShrink: 0 }}>{row.label}</div>
+                    <div style={{ flex: 1, background: "rgba(124,58,237,0.15)", borderRadius: 100, height: 8 }}><div style={{ background: row.color, borderRadius: 100, height: 8, width: `${Math.max(cmNuevos, pmNuevos) > 0 ? (row.value / Math.max(cmNuevos, pmNuevos)) * 100 : 0}%`, transition: "width 1s ease" }} /></div>
                     <div style={{ fontWeight: 800, color: row.tc, width: 28, textAlign: "right" }}>{row.value}</div>
                   </div>
                 ))}
@@ -1586,15 +1603,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
             )}
             {cmEntries.some(e => e.jugadores_nuevos > 0) && (
               <div style={S.card}>
-                <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 14 }}>Día a día este mes</div>
+                <div style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600, marginBottom: 14 }}>Día a día este mes</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {cmEntries.filter(e => e.jugadores_nuevos > 0).map(entry => (
                     <div key={entry.fecha}>
-                      <div onClick={() => setExpandedDay(expandedDay === entry.fecha ? null : entry.fecha)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#0a0a14", borderRadius: 10, cursor: "pointer", border: "1px solid #1e1e38" }}>
+                      <div onClick={() => setExpandedDay(expandedDay === entry.fecha ? null : entry.fecha)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(8,6,18,0.7)", borderRadius: 10, cursor: "pointer", border: "1px solid #1e1e38" }}>
                         <span style={{ color: "#a78bfa", fontSize: 13, fontWeight: 600 }}>{new Date(entry.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
-                        <span style={{ fontWeight: 800, color: "#fbbf24", fontSize: 16 }}>+{entry.jugadores_nuevos}</span>
+                        <span style={{ fontWeight: 800, color: "#f59e0b", fontSize: 16 }}>+{entry.jugadores_nuevos}</span>
                       </div>
-                      {expandedDay === entry.fecha && (entry.jugadores_nuevos_lista || []).length > 0 && (<div style={{ background: "#0a0812", border: "1px solid #1a1530", borderTop: "none", borderRadius: "0 0 10px 10px", padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>{(entry.jugadores_nuevos_lista || []).map(j => <span key={j} style={{ background: "#1a1225", border: "1px solid #3b2a5a", borderRadius: 20, padding: "3px 12px", fontSize: 12, color: "#c084fc" }}>👤 {j}</span>)}</div>)}
+                      {expandedDay === entry.fecha && (entry.jugadores_nuevos_lista || []).length > 0 && (<div style={{ background: "#0a0812", border: "1px solid #1a1530", borderTop: "none", borderRadius: "0 0 10px 10px", padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>{(entry.jugadores_nuevos_lista || []).map(j => <span key={j} style={{ background: "#1a1225", border: "1px solid #3b2a5a", borderRadius: 20, padding: "3px 12px", fontSize: 12, color: "#c4b5fd" }}>👤 {j}</span>)}</div>)}
                     </div>
                   ))}
                 </div>
@@ -1605,59 +1622,59 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "bonos" && (
           <div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c084fc" }}>🎁 Seguimiento de Bonos</h2>
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c4b5fd" }}>🎁 Seguimiento de Bonos</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
-              {[{ label: "Total bonos", value: fmt(totalBonosGeneral), color: "#a78bfa", icon: "🎁" }, { label: "Neto real del mes", value: fmt(cmN - totalBonosGeneral), color: cmN - totalBonosGeneral >= 0 ? "#4ade80" : "#f87171", icon: "📊" }, { label: "Empleados con bonos", value: todosBonos.length > 0 ? [...new Set(todosBonos.map(b => b.empleado))].length : 0, color: "#fbbf24", icon: "👥" }].map(k => (
-                <div key={k.label} style={S.card}><div style={{ display: "flex", justifyContent: "space-between" }}><div style={{ fontSize: 10, color: "#7c6fa0", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><span style={{ fontSize: 20 }}>{k.icon}</span></div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 22, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div></div>
+              {[{ label: "Total bonos", value: fmt(totalBonosGeneral), color: "#a78bfa", icon: "🎁" }, { label: "Neto real del mes", value: fmt(cmN - totalBonosGeneral), color: cmN - totalBonosGeneral >= 0 ? "#10b981" : "#f43f5e", icon: "📊" }, { label: "Empleados con bonos", value: todosBonos.length > 0 ? [...new Set(todosBonos.map(b => b.empleado))].length : 0, color: "#f59e0b", icon: "👥" }].map(k => (
+                <div key={k.label} style={S.card}><div style={{ display: "flex", justifyContent: "space-between" }}><div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><span style={{ fontSize: 20 }}>{k.icon}</span></div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div></div>
               ))}
             </div>
             {rankingEmpleados.length > 0 && (
               <div style={{ ...S.card, marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: "#f87171", fontWeight: 600, marginBottom: 6 }}>🏆 Ranking por diferencias acumuladas</div>
-                <div style={{ fontSize: 11, color: "#4c3a70", marginBottom: 14 }}>Mayor diferencia = mayor riesgo</div>
+                <div style={{ fontSize: 12, color: "#f43f5e", fontWeight: 600, marginBottom: 6 }}>🏆 Ranking por diferencias acumuladas</div>
+                <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 14 }}>Mayor diferencia = mayor riesgo</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {rankingEmpleados.map((emp, i) => {
                     const isRisk = emp.difTotal > 5000 || emp.difNeg > 2;
-                    return (<div key={emp.id} style={{ background: "#0a0a0f", border: "1px solid " + (isRisk ? "#7f1d1d" : "#2a1f4a"), borderRadius: 12, padding: "14px 16px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: i === 0 ? "#f87171" : i === 1 ? "#fbbf24" : "#7c6fa0", fontSize: 16, width: 24 }}>#{i + 1}</div><div><div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14 }}>{emp.nombre}</div><div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 2 }}>{emp.turnos} turnos · {emp.difNeg} dif. negativa{emp.difNeg !== 1 ? "s" : ""}</div></div></div><div style={{ textAlign: "right" }}><div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: isRisk ? "#f87171" : "#7c6fa0", fontSize: 16 }}>{fmt(emp.difTotal)}</div></div></div><div style={{ display: "flex", gap: 16, fontSize: 12 }}><div><span style={{ color: "#4c3a70" }}>Bonos: </span><span style={{ color: "#a78bfa", fontWeight: 600 }}>{fmt(emp.totalBonos)}</span></div>{isRisk && <div style={{ color: "#f87171", fontWeight: 600 }}>⚠️ Requiere atención</div>}</div></div>);
+                    return (<div key={emp.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid " + (isRisk ? "#7f1d1d" : "rgba(124,58,237,0.2)"), borderRadius: 12, padding: "14px 16px" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, color: i === 0 ? "#f43f5e" : i === 1 ? "#f59e0b" : "#6b7280", fontSize: 16, width: 24 }}>#{i + 1}</div><div><div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14 }}>{emp.nombre}</div><div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{emp.turnos} turnos · {emp.difNeg} dif. negativa{emp.difNeg !== 1 ? "s" : ""}</div></div></div><div style={{ textAlign: "right" }}><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, color: isRisk ? "#f43f5e" : "#6b7280", fontSize: 16 }}>{fmt(emp.difTotal)}</div></div></div><div style={{ display: "flex", gap: 16, fontSize: 12 }}><div><span style={{ color: "#4b5563" }}>Bonos: </span><span style={{ color: "#a78bfa", fontWeight: 600 }}>{fmt(emp.totalBonos)}</span></div>{isRisk && <div style={{ color: "#f43f5e", fontWeight: 600 }}>⚠️ Requiere atención</div>}</div></div>);
                   })}
                 </div>
               </div>
             )}
-            {todosBonos.length === 0 && <div style={{ ...S.card, textAlign: "center", padding: 40 }}><div style={{ fontSize: 36, marginBottom: 10 }}>🎁</div><div style={{ color: "#7c6fa0" }}>No hay bonos registrados todavía.</div></div>}
+            {todosBonos.length === 0 && <div style={{ ...S.card, textAlign: "center", padding: 40 }}><div style={{ fontSize: 36, marginBottom: 10 }}>🎁</div><div style={{ color: "#6b7280" }}>No hay bonos registrados todavía.</div></div>}
           </div>
         )}
 
         {activeTab === "bajas" && (
           <div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c084fc" }}>📤 Flujo de Bajas</h2>
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c4b5fd" }}>📤 Flujo de Bajas</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
-              {[{ label: "Total bajado", value: fmt(totalBajasGeneral), color: "#fbbf24", sub: `${todasBajas.length} movimientos` }, { label: "Neto del mes", value: fmt(cmN), color: cmN >= 0 ? "#4ade80" : "#f87171", sub: "generado en el panel" }, { label: "En cuentas", value: fmt(cmN - totalBajasGeneral), color: cmN - totalBajasGeneral >= 0 ? "#4ade80" : "#f87171", sub: "diferencia estimada" }].map(k => (
-                <div key={k.label} style={S.card}><div style={{ fontSize: 10, color: "#7c6fa0", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 22, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div><div style={{ fontSize: 11, color: "#7c6fa0" }}>{k.sub}</div></div>
+              {[{ label: "Total bajado", value: fmt(totalBajasGeneral), color: "#f59e0b", sub: `${todasBajas.length} movimientos` }, { label: "Neto del mes", value: fmt(cmN), color: cmN >= 0 ? "#10b981" : "#f43f5e", sub: "generado en el panel" }, { label: "En cuentas", value: fmt(cmN - totalBajasGeneral), color: cmN - totalBajasGeneral >= 0 ? "#10b981" : "#f43f5e", sub: "diferencia estimada" }].map(k => (
+                <div key={k.label} style={S.card}><div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div><div style={{ fontSize: 11, color: "#6b7280" }}>{k.sub}</div></div>
               ))}
             </div>
             {destinos.filter(d => todasBajas.some(b => b.destinoId === d.id)).length > 0 && (
               <div style={{ ...S.card, marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 14 }}>Por destino</div>
+                <div style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600, marginBottom: 14 }}>Por destino</div>
                 {destinos.map(dest => { const total = todasBajas.filter(b => b.destinoId === dest.id).reduce((s, b) => s + (+b.monto || 0), 0); if (!total) return null; return (
                   <div key={dest.id} style={{ padding: "12px 0", borderBottom: "1px solid #1a1530" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}><div><div style={{ color: "#e2e8f0", fontWeight: 600 }}>{dest.alias}</div><div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 2 }}>👤 {dest.titular} · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{dest.cbu}</span></div></div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: "#fbbf24" }}>{fmt(total)}</div></div>
-                    <div style={{ background: "#1a1530", borderRadius: 100, height: 4 }}><div style={{ background: "linear-gradient(90deg,#d97706,#fbbf24)", borderRadius: 100, height: 4, width: `${totalBajasGeneral > 0 ? (total / totalBajasGeneral) * 100 : 0}%` }} /></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}><div><div style={{ color: "#e2e8f0", fontWeight: 600 }}>{dest.alias}</div><div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>👤 {dest.titular} · <span style={{ fontFamily: "monospace", color: "#a78bfa" }}>{dest.cbu}</span></div></div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, color: "#f59e0b" }}>{fmt(total)}</div></div>
+                    <div style={{ background: "rgba(124,58,237,0.12)", borderRadius: 100, height: 4 }}><div style={{ background: "linear-gradient(90deg,#d97706,#fbbf24)", borderRadius: 100, height: 4, width: `${totalBajasGeneral > 0 ? (total / totalBajasGeneral) * 100 : 0}%` }} /></div>
                   </div>
                 ); })}
               </div>
             )}
             <div style={S.card}>
               <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 600, marginBottom: 14 }}>Historial</div>
-              {todasBajas.length === 0 ? <div style={{ color: "#4c3a70", fontSize: 13 }}>No hay bajas todavía.</div> : todasBajas.map((b, i) => { const bill = bills.find(x => x.id === b.billeteraId); const dest = destinos.find(d => d.id === b.destinoId); return (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1a1530", gap: 10, flexWrap: "wrap" }}><div><div style={{ display: "flex", gap: 10 }}><span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 600 }}>{new Date(b.fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</span><span style={{ fontSize: 11, color: "#c084fc" }}>👤 {b.empleado}</span></div><div style={{ fontSize: 12, color: "#7c6fa0", marginTop: 2 }}><span style={{ color: "#38bdf8" }}>💳 {bill?.nombre || "—"}</span>{dest && <span style={{ marginLeft: 8 }}>→ <span style={{ color: "#fbbf24" }}>{dest.alias}</span></span>}</div></div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>{fmt(+b.monto || 0)}</div></div>); })}
+              {todasBajas.length === 0 ? <div style={{ color: "#4b5563", fontSize: 13 }}>No hay bajas todavía.</div> : todasBajas.map((b, i) => { const bill = bills.find(x => x.id === b.billeteraId); const dest = destinos.find(d => d.id === b.destinoId); return (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1a1530", gap: 10, flexWrap: "wrap" }}><div><div style={{ display: "flex", gap: 10 }}><span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 600 }}>{new Date(b.fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</span><span style={{ fontSize: 11, color: "#c4b5fd" }}>👤 {b.empleado}</span></div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}><span style={{ color: "#38bdf8" }}>💳 {bill?.nombre || "—"}</span>{dest && <span style={{ marginLeft: 8 }}>→ <span style={{ color: "#f59e0b" }}>{dest.alias}</span></span>}</div></div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>{fmt(+b.monto || 0)}</div></div>); })}
             </div>
           </div>
         )}
 
         {activeTab === "importar" && (
           <div style={{ maxWidth: 620 }}>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c084fc" }}>📂 Importar CSV</h2>
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c4b5fd" }}>📂 Importar CSV</h2>
             {!importPreview ? (
-              <div onClick={() => fileRef.current.click()} style={{ border: "2px dashed #4c1d95", borderRadius: 16, padding: "48px", textAlign: "center", cursor: "pointer", background: "#0d0a1a" }} onMouseEnter={e => e.currentTarget.style.borderColor = "#7c3aed"} onMouseLeave={e => e.currentTarget.style.borderColor = "#4c1d95"}>
+              <div onClick={() => fileRef.current.click()} style={{ border: "2px dashed #4c1d95", borderRadius: 16, padding: "48px", textAlign: "center", cursor: "pointer", background: "#0d0a1a" }} onMouseEnter={e => e.currentTarget.style.borderColor = "#7c3aed"} onMouseLeave={e => e.currentTarget.style.borderColor = "#5b21b6"}>
                 <div style={{ fontSize: 40, marginBottom: 10 }}>📁</div>
                 <div style={{ color: "#a78bfa", fontWeight: 600, fontSize: 14 }}>{importing ? "Procesando..." : "Hacé clic para seleccionar el CSV"}</div>
                 <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} style={{ display: "none" }} />
@@ -1667,14 +1684,14 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <div style={{ ...S.card, marginBottom: 14 }}>
                   <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 14 }}>✅ <strong>{importPreview.file}</strong></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
-                    {[{ label: "Días", value: importPreview.data.length, color: "#c084fc" }, { label: "Cargas", value: fmt(sumK(importPreview.data, "cargas")), color: "#4ade80" }, { label: "Retiros", value: fmt(sumK(importPreview.data, "retiros")), color: "#f87171" }, { label: "Jugadores nuevos", value: importPreview.totalNew, color: "#fbbf24" }].map(s => (<div key={s.label} style={{ background: "#0a0a0f", borderRadius: 10, padding: "10px 12px" }}><div style={{ fontSize: 10, color: "#7c6fa0", marginBottom: 4 }}>{s.label}</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div></div>))}
+                    {[{ label: "Días", value: importPreview.data.length, color: "#c4b5fd" }, { label: "Cargas", value: fmt(sumK(importPreview.data, "cargas")), color: "#10b981" }, { label: "Retiros", value: fmt(sumK(importPreview.data, "retiros")), color: "#f43f5e" }, { label: "Jugadores nuevos", value: importPreview.totalNew, color: "#f59e0b" }].map(s => (<div key={s.label} style={{ background: "rgba(8,6,18,0.9)", borderRadius: 10, padding: "10px 12px" }}><div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>{s.label}</div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div></div>))}
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: "#7c6fa0", marginBottom: 10 }}>¿Qué hacemos si ya existen fechas?</div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>¿Qué hacemos si ya existen fechas?</div>
                 <div style={{ display: "flex", gap: 10 }}>
                   <button onClick={() => confirmImport("replace")} style={{ ...S.btn, flex: 1 }}>✅ Reemplazar</button>
                   <button onClick={() => confirmImport("merge")} style={{ flex: 1, background: "#1e1b3a", border: "1px solid #4c1d95", color: "#a78bfa", padding: "12px", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>➕ Sumar</button>
-                  <button onClick={() => setImportPreview(null)} style={{ background: "#1e0a0a", border: "1px solid #7f1d1d", color: "#f87171", padding: "12px 14px", borderRadius: 12, cursor: "pointer" }}>✕</button>
+                  <button onClick={() => setImportPreview(null)} style={{ background: "#1e0a0a", border: "1px solid #7f1d1d", color: "#f43f5e", padding: "12px 14px", borderRadius: 12, cursor: "pointer" }}>✕</button>
                 </div>
               </div>
             )}
@@ -1683,13 +1700,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "cargar" && (
           <div style={{ maxWidth: 460 }}>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#c084fc" }}>{editId ? "✏️ Editar" : "➕ Cargar Día del Panel"}</h2>
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#c4b5fd" }}>{editId ? "✏️ Editar" : "➕ Cargar Día del Panel"}</h2>
             {[{ label: "Fecha", key: "date", type: "date" }, { label: "💰 Cargas ($)", key: "cargas", type: "number", ph: "0" }, { label: "💸 Retiros ($)", key: "retiros", type: "number", ph: "0" }].map(f => (<div key={f.key} style={{ marginBottom: 14 }}><label style={S.label}>{f.label}</label><input type={f.type} value={form[f.key]} placeholder={f.ph} onChange={e => setForm({ ...form, [f.key]: e.target.value })} style={S.input} /></div>))}
             <div style={{ marginBottom: 18 }}><label style={S.label}>📝 Notas</label><textarea value={form.notas} placeholder="Novedades..." onChange={e => setForm({ ...form, notas: e.target.value })} rows={3} style={{ ...S.input, resize: "vertical" }} /></div>
-            {form.cargas && form.retiros && <div style={{ background: "#1a0533", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}><div style={{ display: "flex", gap: 20 }}><div><span style={{ color: "#7c6fa0", fontSize: 12 }}>Neto: </span><span style={{ color: +form.cargas - +form.retiros >= 0 ? "#4ade80" : "#f87171", fontWeight: 700 }}>{fmt(+form.cargas - +form.retiros)}</span></div></div></div>}
+            {form.cargas && form.retiros && <div style={{ background: "rgba(124,58,237,0.1)", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}><div style={{ display: "flex", gap: 20 }}><div><span style={{ color: "#6b7280", fontSize: 12 }}>Neto: </span><span style={{ color: +form.cargas - +form.retiros >= 0 ? "#10b981" : "#f43f5e", fontWeight: 700 }}>{fmt(+form.cargas - +form.retiros)}</span></div></div></div>}
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={addEntry} style={{ ...S.btn, flex: 1 }}>{editId ? "Actualizar" : "Guardar"}</button>
-              {editId && <button onClick={() => { setEditId(null); setForm({ date: todayStr(), cargas: "", retiros: "", notas: "" }); }} style={{ background: "#1e1b3a", border: "1px solid #2a1f4a", color: "#7c6fa0", padding: "12px 18px", borderRadius: 12, cursor: "pointer" }}>Cancelar</button>}
+              {editId && <button onClick={() => { setEditId(null); setForm({ date: todayStr(), cargas: "", retiros: "", notas: "" }); }} style={{ background: "#1e1b3a", border: "1px solid #2a1f4a", color: "#6b7280", padding: "12px 18px", borderRadius: 12, cursor: "pointer" }}>Cancelar</button>}
             </div>
           </div>
         )}
@@ -1697,10 +1714,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
         {activeTab === "historial" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: "#9f67ff" }}>📋 Historial</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>📋 Historial</h2>
               <button onClick={() => { const rows = [["Fecha", "Cargas", "Retiros", "Neto"], ...[...entries].reverse().map(e => [e.fecha, e.cargas, e.retiros, e.cargas - e.retiros])]; const csv = rows.map(r => r.join(",")).join("\n"); const blob = new Blob([csv], { type: "text/csv" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `historial.csv`; a.click(); }} style={S.ghost}>⬇️ Exportar CSV</button>
             </div>
-            {entries.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#475569" }}>No hay registros.</div> : (() => {
+            {entries.length === 0 ? <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>No hay registros.</div> : (() => {
               const byMes = {};
               [...entries].reverse().forEach(e => {
                 const mes = e.fecha.slice(0, 7);
@@ -1721,16 +1738,16 @@ const OwnerDashboard = ({ session, onLogout }) => {
                         <div onClick={() => setExpandedCaja(isOpen ? null : mes)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", flexWrap: "wrap", gap: 10 }}>
                           <div>
                             <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9", textTransform: "capitalize" }}>📅 {mesLabel}</div>
-                            <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>{data.entries.length} días · {data.jugNuevos} jugadores nuevos</div>
+                            <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{data.entries.length} días · {data.jugNuevos} jugadores nuevos</div>
                           </div>
                           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                            {[{ label: "Cargas", v: data.cargas, c: "#4ade80" }, { label: "Retiros", v: data.retiros, c: "#f87171" }, { label: "Neto", v: neto, c: neto >= 0 ? "#4ade80" : "#f87171" }].map(x => (
+                            {[{ label: "Cargas", v: data.cargas, c: "#10b981" }, { label: "Retiros", v: data.retiros, c: "#f43f5e" }, { label: "Neto", v: neto, c: neto >= 0 ? "#10b981" : "#f43f5e" }].map(x => (
                               <div key={x.label} style={{ textAlign: "right" }}>
-                                <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
+                                <div style={{ fontSize: 10, color: "#64748b" }}>{x.label}</div>
                                 <div style={{ color: x.c, fontWeight: 700, fontSize: 14 }}>{fmt(x.v)}</div>
                               </div>
                             ))}
-                            <span style={{ color: "#475569", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span>
+                            <span style={{ color: "#64748b", fontSize: 13 }}>{isOpen ? "▲" : "▼"}</span>
                           </div>
                         </div>
                         {isOpen && (
@@ -1738,22 +1755,22 @@ const OwnerDashboard = ({ session, onLogout }) => {
                             {data.entries.map(entry => {
                               const neto = entry.cargas - entry.retiros;
                               return (
-                                <div key={entry.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 11, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                                <div key={entry.id} style={{ background: "#080612", border: "1px solid #1e1e38", borderRadius: 11, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                                   <div>
                                     <div style={{ fontWeight: 600, color: "#a78bfa", fontSize: 13 }}>{new Date(entry.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
-                                    {entry.notas && <div style={{ fontSize: 11, color: "#475569", marginTop: 1 }}>{entry.notas}</div>}
-                                    {entry.jugadores_nuevos > 0 && <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 1 }}>🆕 {entry.jugadores_nuevos} nuevos</div>}
+                                    {entry.notas && <div style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>{entry.notas}</div>}
+                                    {entry.jugadores_nuevos > 0 && <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 1 }}>🆕 {entry.jugadores_nuevos} nuevos</div>}
                                   </div>
                                   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                                    {[{ label: "Cargas", v: entry.cargas, c: "#4ade80" }, { label: "Retiros", v: entry.retiros, c: "#f87171" }, { label: "Neto", v: neto, c: neto >= 0 ? "#4ade80" : "#f87171" }].map(x => (
+                                    {[{ label: "Cargas", v: entry.cargas, c: "#10b981" }, { label: "Retiros", v: entry.retiros, c: "#f43f5e" }, { label: "Neto", v: neto, c: neto >= 0 ? "#10b981" : "#f43f5e" }].map(x => (
                                       <div key={x.label} style={{ textAlign: "right" }}>
-                                        <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
+                                        <div style={{ fontSize: 10, color: "#64748b" }}>{x.label}</div>
                                         <div style={{ color: x.c, fontWeight: 600, fontSize: 13 }}>{fmt(x.v)}</div>
                                       </div>
                                     ))}
                                     <div style={{ display: "flex", gap: 5 }}>
-                                      <button onClick={e => { e.stopPropagation(); editEntry(entry); }} style={{ background: "#0e0e1a", border: "1px solid #2a1f4a", color: "#a78bfa", padding: "4px 8px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>✏️</button>
-                                      <button onClick={e => { e.stopPropagation(); delEntry(entry.id); }} style={{ background: "#1e0a0a", border: "1px solid #7f1d1d", color: "#f87171", padding: "4px 8px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>🗑️</button>
+                                      <button onClick={e => { e.stopPropagation(); editEntry(entry); }} style={{ background: "rgba(15,13,31,0.85)", border: "1px solid #2a1f4a", color: "#a78bfa", padding: "4px 8px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>✏️</button>
+                                      <button onClick={e => { e.stopPropagation(); delEntry(entry.id); }} style={{ background: "#1e0a0a", border: "1px solid #7f1d1d", color: "#f43f5e", padding: "4px 8px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>🗑️</button>
                                     </div>
                                   </div>
                                 </div>
@@ -1772,18 +1789,18 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "campana" && (
           <div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c084fc" }}>📣 Campaña de Recuperación</h2>
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c4b5fd" }}>📣 Campaña de Recuperación</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
-              {[{ label: "Mensajes enviados", value: (campaign.enviados || 0).toLocaleString("es-AR"), icon: "📨", color: "#818cf8" }, { label: "Recuperados", value: (campaign.recuperados || 0).toLocaleString("es-AR"), icon: "🔄", color: "#4ade80" }, { label: "Depósitos generados", value: fmt(campaign.depositos), icon: "💵", color: "#fbbf24" }].map(s => (<div key={s.label} style={S.card}><div style={{ fontSize: 22, marginBottom: 8 }}>{s.icon}</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 11, color: "#7c6fa0", marginTop: 4 }}>{s.label}</div></div>))}
+              {[{ label: "Mensajes enviados", value: (campaign.enviados || 0).toLocaleString("es-AR"), icon: "📨", color: "#818cf8" }, { label: "Recuperados", value: (campaign.recuperados || 0).toLocaleString("es-AR"), icon: "🔄", color: "#10b981" }, { label: "Depósitos generados", value: fmt(campaign.depositos), icon: "💵", color: "#f59e0b" }].map(s => (<div key={s.label} style={S.card}><div style={{ fontSize: 22, marginBottom: 8 }}>{s.icon}</div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div><div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{s.label}</div></div>))}
             </div>
-            <div style={{ background: "linear-gradient(135deg,#1a0533,#0d1b3e)", border: "1px solid #4c1d95", borderRadius: 14, padding: "16px 20px", marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><span style={{ fontSize: 13, color: "#a78bfa" }}>Tasa de recuperación</span><span style={{ fontFamily: "'Syne',sans-serif", fontSize: 22, fontWeight: 800, color: recoveryRate > 10 ? "#4ade80" : recoveryRate > 5 ? "#fbbf24" : "#f87171" }}>{recoveryRate}%</span></div>
-              <div style={{ background: "#2a1f4a", borderRadius: 100, height: 8 }}><div style={{ background: "linear-gradient(90deg,#7c3aed,#4ade80)", borderRadius: 100, height: 8, width: `${Math.min(recoveryRate, 100)}%` }} /></div>
+            <div style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(8,6,18,0.9))", border: "1px solid #4c1d95", borderRadius: 14, padding: "16px 20px", marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><span style={{ fontSize: 13, color: "#a78bfa" }}>Tasa de recuperación</span><span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 800, color: recoveryRate > 10 ? "#10b981" : recoveryRate > 5 ? "#f59e0b" : "#f43f5e" }}>{recoveryRate}%</span></div>
+              <div style={{ background: "rgba(124,58,237,0.2)", borderRadius: 100, height: 8 }}><div style={{ background: "linear-gradient(90deg,#7c3aed,#4ade80)", borderRadius: 100, height: 8, width: `${Math.min(recoveryRate, 100)}%` }} /></div>
             </div>
             <div style={S.card}>
               <div style={{ fontSize: 12, color: "#a78bfa", marginBottom: 14, fontWeight: 600 }}>Actualizar</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
-                {[{ label: "📨 Enviados", key: "enviados", ph: campaign.enviados }, { label: "🔄 Recuperados", key: "recuperados", ph: campaign.recuperados }, { label: "💵 Depósitos ($)", key: "depositos", ph: campaign.depositos }].map(f => (<div key={f.key}><label style={S.label}>{f.label}</label><input type="number" placeholder={f.ph} value={campForm[f.key]} onChange={e => setCampForm({ ...campForm, [f.key]: e.target.value })} style={{ width: "100%", background: "#0a0a0f", border: "1px solid #2a1f4a", borderRadius: 8, padding: "10px 12px", color: "#e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box" }} /></div>))}
+                {[{ label: "📨 Enviados", key: "enviados", ph: campaign.enviados }, { label: "🔄 Recuperados", key: "recuperados", ph: campaign.recuperados }, { label: "💵 Depósitos ($)", key: "depositos", ph: campaign.depositos }].map(f => (<div key={f.key}><label style={S.label}>{f.label}</label><input type="number" placeholder={f.ph} value={campForm[f.key]} onChange={e => setCampForm({ ...campForm, [f.key]: e.target.value })} style={{ width: "100%", background: "rgba(8,6,18,0.9)", border: "1px solid #2a1f4a", borderRadius: 8, padding: "10px 12px", color: "#e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box" }} /></div>))}
               </div>
               <button onClick={saveCamp} style={S.btn}>Guardar</button>
             </div>
@@ -1792,7 +1809,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "meses" && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#9f67ff" }}>📆 Historial por Mes</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#a78bfa" }}>📆 Historial por Mes</h2>
             {(() => {
               const mesesData = {};
               entries.forEach(e => {
@@ -1806,24 +1823,24 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 mesesData[mes].jugUnicos += e.jugadoresUnicos || 0;
               });
               const lista = Object.values(mesesData).sort((a,b) => b.mes.localeCompare(a.mes));
-              if (lista.length === 0) return <div style={{ ...S.card, textAlign: "center", padding: 40, color: "#475569" }}>No hay datos todavía. Importá CSVs para ver el historial mensual.</div>;
+              if (lista.length === 0) return <div style={{ ...S.card, textAlign: "center", padding: 40, color: "#64748b" }}>No hay datos todavía. Importá CSVs para ver el historial mensual.</div>;
               const maxNeto = Math.max(...lista.map(m => Math.abs(m.neto)), 1);
               return (
                 <div>
                   <div style={{ ...S.card, marginBottom: 20 }}>
-                    <div style={{ fontSize: 12, color: "#9f67ff", fontWeight: 700, marginBottom: 16 }}>Evolución mensual</div>
+                    <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 16 }}>Evolución mensual</div>
                     <ResponsiveContainer width="100%" height={180}>
                       <AreaChart data={[...lista].reverse()} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                         <defs>
-                          <linearGradient id="gCargas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/><stop offset="95%" stopColor="#4ade80" stopOpacity={0}/></linearGradient>
-                          <linearGradient id="gRetiros" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
+                          <linearGradient id="gCargas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                          <linearGradient id="gRetiros" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/><stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/></linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e1e38" />
-                        <XAxis dataKey="mes" tick={{ fill: "#475569", fontSize: 11 }} />
-                        <YAxis tick={{ fill: "#475569", fontSize: 11 }} tickFormatter={v => "$"+Math.round(v/1000)+"k"} />
-                        <Tooltip formatter={(v, n) => [fmt(v), n === "cargas" ? "Cargas" : "Retiros"]} contentStyle={{ background: "#0e0e1a", border: "1px solid #1e1e38", borderRadius: 10 }} />
-                        <Area type="monotone" dataKey="cargas" stroke="#4ade80" fill="url(#gCargas)" strokeWidth={2} />
-                        <Area type="monotone" dataKey="retiros" stroke="#f87171" fill="url(#gRetiros)" strokeWidth={2} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(124,58,237,0.15)" />
+                        <XAxis dataKey="mes" tick={{ fill: "#64748b", fontSize: 11 }} />
+                        <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickFormatter={v => "$"+Math.round(v/1000)+"k"} />
+                        <Tooltip formatter={(v, n) => [fmt(v), n === "cargas" ? "Cargas" : "Retiros"]} contentStyle={{ background: "rgba(15,13,31,0.85)", border: "1px solid #1e1e38", borderRadius: 10 }} />
+                        <Area type="monotone" dataKey="cargas" stroke="#10b981" fill="url(#gCargas)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="retiros" stroke="#f43f5e" fill="url(#gRetiros)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -1837,16 +1854,16 @@ const OwnerDashboard = ({ session, onLogout }) => {
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                             <div>
                               <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9", textTransform: "capitalize" }}>{mesLabel}</div>
-                              <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{m.dias} días · {m.jugNuevos} nuevos · {m.jugUnicos} únicos</div>
+                              <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{m.dias} días · {m.jugNuevos} nuevos · {m.jugUnicos} únicos</div>
                             </div>
                             <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Cargas</div><div style={{ color: "#4ade80", fontWeight: 700, fontSize: 14 }}>{fmt(m.cargas)}</div></div>
-                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Retiros</div><div style={{ color: "#f87171", fontWeight: 700, fontSize: 14 }}>{fmt(m.retiros)}</div></div>
-                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Neto</div><div style={{ color: m.neto >= 0 ? "#4ade80" : "#f87171", fontWeight: 800, fontSize: 18 }}>{fmt(m.neto)}</div></div>
-                              {prev && <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>vs ant.</div><div style={{ color: diff >= 0 ? "#4ade80" : "#f87171", fontWeight: 700, fontSize: 13 }}>{diff >= 0 ? "+" : ""}{fmt(diff)}</div></div>}
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>Cargas</div><div style={{ color: "#10b981", fontWeight: 700, fontSize: 14 }}>{fmt(m.cargas)}</div></div>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>Retiros</div><div style={{ color: "#f43f5e", fontWeight: 700, fontSize: 14 }}>{fmt(m.retiros)}</div></div>
+                              <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>Neto</div><div style={{ color: m.neto >= 0 ? "#10b981" : "#f43f5e", fontWeight: 800, fontSize: 18 }}>{fmt(m.neto)}</div></div>
+                              {prev && <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>vs ant.</div><div style={{ color: diff >= 0 ? "#10b981" : "#f43f5e", fontWeight: 700, fontSize: 13 }}>{diff >= 0 ? "+" : ""}{fmt(diff)}</div></div>}
                             </div>
                           </div>
-                          <div style={{ background: "#07070f", borderRadius: 8, height: 6 }}>
+                          <div style={{ background: "#080612", borderRadius: 8, height: 6 }}>
                             <div style={{ background: m.neto >= 0 ? "linear-gradient(90deg,#059669,#4ade80)" : "linear-gradient(90deg,#dc2626,#f87171)", borderRadius: 8, height: 6, width: `${Math.min((Math.abs(m.neto)/maxNeto)*100, 100)}%`, transition: "width 1s ease" }} />
                           </div>
                         </div>
@@ -1864,13 +1881,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
               <div style={{ width: 46, height: 46, borderRadius: 14, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🤖</div>
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: "#9f67ff" }}>IA Analista</h2>
-                <p style={{ color: "#475569", fontSize: 12, margin: "3px 0 0" }}>Análisis inteligente de tu operación en tiempo real</p>
+                <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>IA Analista</h2>
+                <p style={{ color: "#64748b", fontSize: 12, margin: "3px 0 0" }}>Análisis inteligente de tu operación en tiempo real</p>
               </div>
             </div>
 
             <div style={{ ...S.card, marginBottom: 16, background: "linear-gradient(135deg,rgba(124,58,237,0.08),rgba(79,70,229,0.05))", borderColor: "rgba(124,58,237,0.3)" }}>
-              <div style={{ fontSize: 12, color: "#9f67ff", fontWeight: 700, marginBottom: 10 }}>📊 Datos que va a analizar</div>
+              <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 10 }}>📊 Datos que va a analizar</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
                 {[
                   { label: "Cargas del mes", v: fmt(cmN + cmR) },
@@ -1879,7 +1896,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   { label: "Alertas de caja", v: alertas.length },
                 ].map(x => (
                   <div key={x.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
-                    <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>{x.label}</div>
+                    <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>{x.label}</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{x.v}</div>
                   </div>
                 ))}
@@ -1887,7 +1904,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
             </div>
 
             <div style={{ ...S.card, marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: "#475569", fontWeight: 600, marginBottom: 10 }}>💬 Preguntale algo específico (opcional)</div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 600, marginBottom: 10 }}>💬 Preguntale algo específico (opcional)</div>
               <div style={{ display: "flex", gap: 10 }}>
                 <input
                   type="text"
@@ -1950,7 +1967,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 {["¿Qué días rinden más?", "¿Hay riesgo en empleados?", "¿Están creciendo los jugadores?", "Recomendaciones para esta semana"].map(q => (
-                  <button key={q} onClick={() => setIaPregunta(q)} style={{ background: "#0a0a16", border: "1px solid #1e1e38", color: "#475569", padding: "5px 12px", borderRadius: 20, cursor: "pointer", fontSize: 11 }}>{q}</button>
+                  <button key={q} onClick={() => setIaPregunta(q)} style={{ background: "rgba(8,6,18,0.8)", border: "1px solid #1e1e38", color: "#64748b", padding: "5px 12px", borderRadius: 20, cursor: "pointer", fontSize: 11 }}>{q}</button>
                 ))}
               </div>
             </div>
@@ -1958,8 +1975,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
             {iaLoading && (
               <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>🤖</div>
-                <div style={{ color: "#9f67ff", fontWeight: 600, fontSize: 15 }}>Analizando tu operación...</div>
-                <div style={{ color: "#475569", fontSize: 12, marginTop: 6 }}>Procesando datos del panel, caja y empleados</div>
+                <div style={{ color: "#a78bfa", fontWeight: 600, fontSize: 15 }}>Analizando tu operación...</div>
+                <div style={{ color: "#64748b", fontSize: 12, marginTop: 6 }}>Procesando datos del panel, caja y empleados</div>
               </div>
             )}
 
@@ -1967,13 +1984,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
               <div style={{ ...S.card, borderColor: "rgba(124,58,237,0.3)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
                   <div style={{ width: 32, height: 32, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🤖</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#9f67ff" }}>Análisis de IA</div>
-                  <button onClick={() => setIaAnalisis(null)} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 18 }}>✕</button>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>Análisis de IA</div>
+                  <button onClick={() => setIaAnalisis(null)} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 18 }}>✕</button>
                 </div>
                 <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{iaAnalisis}</div>
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #1e1e38", display: "flex", gap: 10 }}>
                   <button onClick={() => { setIaAnalisis(null); setIaPregunta(""); }} style={S.ghost}>Nueva consulta</button>
-                  <button onClick={() => navigator.clipboard?.writeText(iaAnalisis)} style={{ ...S.ghost, color: "#475569" }}>📋 Copiar</button>
+                  <button onClick={() => navigator.clipboard?.writeText(iaAnalisis)} style={{ ...S.ghost, color: "#64748b" }}>📋 Copiar</button>
                 </div>
               </div>
             )}
@@ -1981,8 +1998,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
             {!iaAnalisis && !iaLoading && (
               <div style={{ ...S.card, textAlign: "center", padding: 40, borderStyle: "dashed" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🧠</div>
-                <div style={{ color: "#9f67ff", fontWeight: 600, fontSize: 15, marginBottom: 6 }}>IA lista para analizar</div>
-                <div style={{ color: "#475569", fontSize: 13 }}>Presioná "Analizar" para obtener un diagnóstico de tu operación,<br/>o escribí una pregunta específica.</div>
+                <div style={{ color: "#a78bfa", fontWeight: 600, fontSize: 15, marginBottom: 6 }}>IA lista para analizar</div>
+                <div style={{ color: "#64748b", fontSize: 13 }}>Presioná "Analizar" para obtener un diagnóstico de tu operación,<br/>o escribí una pregunta específica.</div>
               </div>
             )}
           </div>
@@ -1990,8 +2007,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "empleados_hist" && (
           <div>
-            <h2 style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#9f67ff" }}>👤 Historial por Empleado</h2>
-            {empleados.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#475569", padding: 40 }}>No hay empleados todavía.</div> : (
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#a78bfa" }}>👤 Historial por Empleado</h2>
+            {empleados.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#64748b", padding: 40 }}>No hay empleados todavía.</div> : (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {empleados.map(emp => {
                   const empCajas = cajaHistorial.filter(c => c.empleado_nombre === emp.nombre);
@@ -2004,21 +2021,21 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 13, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>👤</div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: emp.activo ? "#f1f5f9" : "#475569" }}>{emp.nombre}</div>
-                          <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: emp.activo ? "#f1f5f9" : "#64748b" }}>{emp.nombre}</div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
                             {emp.horario_inicio ? `⏰ ${emp.horario_inicio}${emp.horario_fin ? " – " + emp.horario_fin : ""}` : "Sin horario fijo"} · {empCajas.length} turnos
                           </div>
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                        <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Total mov.</div><div style={{ color: totalMov >= 0 ? "#4ade80" : "#f87171", fontWeight: 700 }}>{fmt(totalMov)}</div></div>
-                        <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#475569" }}>Dif. acum.</div><div style={{ color: alertasEmp > 2 ? "#f87171" : "#475569", fontWeight: 700 }}>{fmt(totalDifAbs)}</div></div>
-                        {alertasEmp > 0 && <Tag color="#f87171">⚠️ {alertasEmp} alerta{alertasEmp > 1 ? "s" : ""}</Tag>}
-                        <span style={{ color: "#475569", fontSize: 12 }}>{isOpen ? "▲" : "▼"}</span>
+                        <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>Total mov.</div><div style={{ color: totalMov >= 0 ? "#10b981" : "#f43f5e", fontWeight: 700 }}>{fmt(totalMov)}</div></div>
+                        <div style={{ textAlign: "right" }}><div style={{ fontSize: 10, color: "#64748b" }}>Dif. acum.</div><div style={{ color: alertasEmp > 2 ? "#f43f5e" : "#64748b", fontWeight: 700 }}>{fmt(totalDifAbs)}</div></div>
+                        {alertasEmp > 0 && <Tag color="#f43f5e">⚠️ {alertasEmp} alerta{alertasEmp > 1 ? "s" : ""}</Tag>}
+                        <span style={{ color: "#64748b", fontSize: 12 }}>{isOpen ? "▲" : "▼"}</span>
                       </div>
                     </div>
                     {isOpen && (<div>
-                      {empCajas.length === 0 ? <div style={{ color: "#475569", fontSize: 13, fontStyle: "italic" }}>Sin registros de caja todavía.</div> : (
+                      {empCajas.length === 0 ? <div style={{ color: "#64748b", fontSize: 13, fontStyle: "italic" }}>Sin registros de caja todavía.</div> : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {empCajas.map(c => {
                             const de = entries.find(e => e.fecha === c.fecha);
@@ -2026,23 +2043,23 @@ const OwnerDashboard = ({ session, onLogout }) => {
                             const pn = calcPnTurno(c.fecha, c.turno_label, de);
                             const difReal = pn !== null ? c.mov - pn : c.dif;
                             const hasDif = Math.abs(difReal || 0) > 100;
-                            return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "#1a0808" : "#0a0a14", border: "1px solid " + (hasDif ? "#7f1d1d" : C.border), borderRadius: 12, padding: "13px 15px" }}>
+                            return (<div key={c.fecha + c.turno_id} style={{ background: hasDif ? "rgba(244,63,94,0.06)" : "rgba(8,6,18,0.7)", border: "1px solid " + (hasDif ? "#7f1d1d" : C.border), borderRadius: 12, padding: "13px 15px" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                                 <div>
                                   <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>{new Date(c.fecha + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
-                                  <span style={{ fontSize: 11, color: "#475569", marginLeft: 10 }}>{c.turnoLabel}</span>
+                                  <span style={{ fontSize: 11, color: "#64748b", marginLeft: 10 }}>{c.turnoLabel}</span>
                                 </div>
                                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f87171" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#4ade80" : "#f87171" }, ...(pn !== null ? [{ label: "Esperado (panel)", v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: difReal, col: hasDif ? "#f87171" : "#4ade80" }].map(x => (
+                                  {[{ label: "Apertura", v: c.tI, col: "#38bdf8" }, { label: "Cierre", v: c.tC, col: "#f43f5e" }, { label: "Real", v: c.mov, col: c.mov >= 0 ? "#10b981" : "#f43f5e" }, ...(pn !== null ? [{ label: "Esperado (panel)", v: pn, col: "#a78bfa" }] : []), { label: "Diferencia", v: difReal, col: hasDif ? "#f43f5e" : "#10b981" }].map(x => (
                                     <div key={x.label} style={{ textAlign: "right" }}>
-                                      <div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div>
+                                      <div style={{ fontSize: 10, color: "#64748b" }}>{x.label}</div>
                                       <div style={{ color: x.col, fontWeight: 700, fontSize: 12 }}>{x.label === "Diferencia" && difReal > 0 ? "+" : ""}{fmt(x.v)}</div>
                                     </div>
                                   ))}
                                   <Badge ok={!hasDif} />
                                 </div>
                               </div>
-                              {hasDif && <div style={{ fontSize: 12, color: "#f87171", fontWeight: 600 }}>⚠️ Diferencia significativa entre caja y panel</div>}
+                              {hasDif && <div style={{ fontSize: 12, color: "#f43f5e", fontWeight: 600 }}>⚠️ Diferencia significativa entre caja y panel</div>}
                             </div>);
                           })}
                         </div>
@@ -2057,7 +2074,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
         {activeTab === "ajustes" && (
           <div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#c084fc" }}>⚙️ Ajustes</h2>
+            <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#c4b5fd" }}>⚙️ Ajustes</h2>
             <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
               {[{ id: "billeteras", label: "💳 Billeteras" }, { id: "empleados", label: "👥 Empleados" }, { id: "sueldos", label: "💵 Sueldos" }, { id: "bajas", label: "📤 Destinos Bajas" }, { id: "negocio", label: "🏷️ Negocio" }].map(t => (<button key={t.id} onClick={() => setSettingsTab(t.id)} style={S.subBtn(settingsTab === t.id)}>{t.label}</button>))}
             </div>
@@ -2066,7 +2083,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
               <div style={{ maxWidth: 500 }}>
                 <div style={S.card}>
                   <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 600, marginBottom: 16 }}>Billeteras del negocio</div>
-                  {bills.length > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>{bills.map((b, idx) => (<div key={b.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0a0f", borderRadius: 10, padding: "11px 14px", border: "1px solid #2a1f4a" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span>💳</span><span style={{ color: "#e2e8f0", fontSize: 14 }}>{b.nombre}</span></div><div style={{ display: "flex", gap: 6 }}><button onClick={() => moveBill(b.id, -1)} disabled={idx === 0} style={{ background: "#1e1b3a", border: "1px solid #2a1f4a", color: idx === 0 ? "#2a1f4a" : "#7c6fa0", padding: "4px 8px", borderRadius: 6, cursor: idx === 0 ? "default" : "pointer", fontSize: 11 }}>▲</button><button onClick={() => moveBill(b.id, 1)} disabled={idx === bills.length - 1} style={{ background: "#1e1b3a", border: "1px solid #2a1f4a", color: idx === bills.length - 1 ? "#2a1f4a" : "#7c6fa0", padding: "4px 8px", borderRadius: 6, cursor: idx === bills.length - 1 ? "default" : "pointer", fontSize: 11 }}>▼</button><button onClick={() => delBill(b.id)} style={S.danger}>🗑️</button></div></div>))}</div>)}
+                  {bills.length > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>{bills.map((b, idx) => (<div key={b.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(8,6,18,0.9)", borderRadius: 10, padding: "11px 14px", border: "1px solid #2a1f4a" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span>💳</span><span style={{ color: "#e2e8f0", fontSize: 14 }}>{b.nombre}</span></div><div style={{ display: "flex", gap: 6 }}><button onClick={() => moveBill(b.id, -1)} disabled={idx === 0} style={{ background: "#1e1b3a", border: "1px solid #2a1f4a", color: idx === 0 ? "rgba(124,58,237,0.2)" : "#6b7280", padding: "4px 8px", borderRadius: 6, cursor: idx === 0 ? "default" : "pointer", fontSize: 11 }}>▲</button><button onClick={() => moveBill(b.id, 1)} disabled={idx === bills.length - 1} style={{ background: "#1e1b3a", border: "1px solid #2a1f4a", color: idx === bills.length - 1 ? "rgba(124,58,237,0.2)" : "#6b7280", padding: "4px 8px", borderRadius: 6, cursor: idx === bills.length - 1 ? "default" : "pointer", fontSize: 11 }}>▼</button><button onClick={() => delBill(b.id)} style={S.danger}>🗑️</button></div></div>))}</div>)}
                   <div style={{ display: "flex", gap: 10 }}><input type="text" value={newBillName} placeholder='"MP Principal", "Brubank 2"...' onChange={e => setNewBillName(e.target.value)} onKeyDown={e => e.key === "Enter" && addBill()} style={{ ...S.input, flex: 1 }} /><button onClick={addBill} style={{ ...S.btn, padding: "11px 18px" }}>+</button></div>
                 </div>
               </div>
@@ -2075,7 +2092,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
             {settingsTab === "empleados" && (
               <div style={{ maxWidth: 680 }}>
                 <div style={{ ...S.card, marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: "#9f67ff", fontWeight: 700, marginBottom: 12 }}>➕ Agregar empleado</div>
+                  <div style={{ fontSize: 13, color: "#a78bfa", fontWeight: 700, marginBottom: 12 }}>➕ Agregar empleado</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
                     {[{ label: "Nombre", key: "nombre", ph: "Juan Pérez" }, { label: "Usuario", key: "usuario", ph: "juanperez" }, { label: "Contraseña", key: "pass", ph: "••••••", type: "password" }].map(f => (<div key={f.key}><label style={S.label}>{f.label}</label><input type={f.type || "text"} value={newEmpForm[f.key]} placeholder={f.ph} onChange={e => setNewEmpForm({ ...newEmpForm, [f.key]: e.target.value })} style={S.input} /></div>))}
                   </div>
@@ -2088,15 +2105,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
                         const horFin = (newEmpForm.horarios_dia || {})[d.id + "_fin"] || "";
                         return (
                           <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <button onClick={() => { const dias = newEmpForm.dias || []; setNewEmpForm({ ...newEmpForm, dias: dias.includes(d.id) ? dias.filter(x => x !== d.id) : [...dias, d.id] }); }} style={{ width: 52, padding: "7px 0", border: "1px solid " + (on ? "#7c3aed" : C.border), borderRadius: 8, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#475569", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
+                            <button onClick={() => { const dias = newEmpForm.dias || []; setNewEmpForm({ ...newEmpForm, dias: dias.includes(d.id) ? dias.filter(x => x !== d.id) : [...dias, d.id] }); }} style={{ width: 52, padding: "7px 0", border: "1px solid " + (on ? "#7c3aed" : C.border), borderRadius: 8, background: on ? "rgba(124,58,237,0.2)" : "rgba(8,6,18,0.9)", color: on ? "#c4b5fd" : "#64748b", cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
                             {on ? (
                               <div style={{ display: "flex", gap: 8, flex: 1, alignItems: "center" }}>
                                 <input type="time" value={horIni} placeholder="Desde" onChange={e => setNewEmpForm({ ...newEmpForm, horarios_dia: { ...(newEmpForm.horarios_dia || {}), [d.id + "_ini"]: e.target.value } })} style={{ ...S.input, fontSize: 12, flex: 1 }} />
-                                <span style={{ color: "#475569", fontSize: 12 }}>–</span>
+                                <span style={{ color: "#64748b", fontSize: 12 }}>–</span>
                                 <input type="time" value={horFin} placeholder="Hasta" onChange={e => setNewEmpForm({ ...newEmpForm, horarios_dia: { ...(newEmpForm.horarios_dia || {}), [d.id + "_fin"]: e.target.value } })} style={{ ...S.input, fontSize: 12, flex: 1 }} />
                               </div>
                             ) : (
-                              <span style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Franco</span>
+                              <span style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>Franco</span>
                             )}
                           </div>
                         );
@@ -2105,17 +2122,17 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   </div>
                   <button onClick={addEmp} style={S.btn}>Agregar empleado</button>
                 </div>
-                {empleados.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#475569", fontSize: 13 }}>No hay empleados todavía.</div> : (
+                {empleados.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#64748b", fontSize: 13 }}>No hay empleados todavía.</div> : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {empleados.map(emp => (<div key={emp.id} style={{ ...S.card, borderColor: emp.activo ? C.border : "#1a1020" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
                         <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: emp.activo ? "#4ade80" : "#4a4a5a" }} /><span style={{ color: emp.activo ? "#f1f5f9" : "#475569", fontSize: 14, fontWeight: 600 }}>{emp.nombre}</span></div>
-                          <div style={{ fontSize: 11, color: "#475569", marginTop: 3, marginLeft: 16 }}>👤 {emp.usuario} · {(emp.dias || []).length} días activos</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: emp.activo ? "#10b981" : "#4a4a5a" }} /><span style={{ color: emp.activo ? "#f1f5f9" : "#64748b", fontSize: 14, fontWeight: 600 }}>{emp.nombre}</span></div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginTop: 3, marginLeft: 16 }}>👤 {emp.usuario} · {(emp.dias || []).length} días activos</div>
                         </div>
                         <div style={{ display: "flex", gap: 8 }}><button onClick={() => toggleEmp(emp.id, emp.activo)} style={S.ghost}>{emp.activo ? "Desactivar" : "Activar"}</button><button onClick={() => delEmp(emp.id)} style={S.danger}>🗑️</button></div>
                       </div>
-                      <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, fontWeight: 600 }}>Días y horarios</div>
+                      <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, fontWeight: 600 }}>Días y horarios</div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {DIAS.map(d => {
                           const on = (emp.dias || []).includes(d.id);
@@ -2124,7 +2141,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                           const horFin = horarios_dia[d.id + "_fin"] || emp.horario_fin || "";
                           return (
                             <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <button onClick={() => updateEmpDia(emp.id, d.id)} style={{ width: 52, padding: "6px 0", border: `1px solid ${on ? "#7c3aed" : "#1a1530"}`, borderRadius: 7, background: on ? "#2d1b69" : "#0a0a0f", color: on ? "#c084fc" : "#4c3a70", cursor: "pointer", fontSize: 12, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
+                              <button onClick={() => updateEmpDia(emp.id, d.id)} style={{ width: 52, padding: "6px 0", border: `1px solid ${on ? "#7c3aed" : "rgba(124,58,237,0.12)"}`, borderRadius: 7, background: on ? "rgba(124,58,237,0.2)" : "rgba(8,6,18,0.9)", color: on ? "#c4b5fd" : "#4b5563", cursor: "pointer", fontSize: 12, fontWeight: on ? 700 : 400, textAlign: "center", flexShrink: 0 }}>{d.label}</button>
                               {on ? (
                                 <div style={{ display: "flex", gap: 8, flex: 1, alignItems: "center" }}>
                                   <input type="time" value={horIni} placeholder="Desde" onChange={e => {
@@ -2132,7 +2149,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                     db.updateEmpleado(emp.id, { horarios_dia: newHD });
                                     setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, horarios_dia: newHD } : x));
                                   }} style={{ ...S.input, fontSize: 12, flex: 1 }} />
-                                  <span style={{ color: "#475569", fontSize: 12 }}>–</span>
+                                  <span style={{ color: "#64748b", fontSize: 12 }}>–</span>
                                   <input type="time" value={horFin} placeholder="Hasta" onChange={e => {
                                     const newHD = { ...(emp.horarios_dia || {}), [d.id + "_fin"]: e.target.value };
                                     db.updateEmpleado(emp.id, { horarios_dia: newHD });
@@ -2140,7 +2157,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                   }} style={{ ...S.input, fontSize: 12, flex: 1 }} />
                                 </div>
                               ) : (
-                                <span style={{ fontSize: 12, color: "#4c3a70", fontStyle: "italic" }}>Franco</span>
+                                <span style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>Franco</span>
                               )}
                             </div>
                           );
@@ -2148,7 +2165,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       </div>
                       {bills.length > 0 && (
                         <div style={{ marginTop: 14 }}>
-                          <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, fontWeight: 600 }}>Billeteras que usa</div>
+                          <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, fontWeight: 600 }}>Billeteras que usa</div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {bills.map(b => {
                               const empBills = emp.billeteras || [];
@@ -2158,13 +2175,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                   const newBills = assigned ? empBills.filter(x => x !== b.id) : [...empBills, b.id];
                                   db.updateEmpleado(emp.id, { billeteras: newBills });
                                   setEmpleados(emps => emps.map(x => x.id === emp.id ? { ...x, billeteras: newBills } : x));
-                                }} style={{ padding: "6px 14px", border: "1px solid " + (assigned ? "#7c3aed" : "#1a1530"), borderRadius: 8, background: assigned ? "#2d1b69" : "#0a0a0f", color: assigned ? "#c084fc" : "#4c3a70", cursor: "pointer", fontSize: 12, fontWeight: assigned ? 700 : 400 }}>
+                                }} style={{ padding: "6px 14px", border: "1px solid " + (assigned ? "#7c3aed" : "rgba(124,58,237,0.12)"), borderRadius: 8, background: assigned ? "rgba(124,58,237,0.2)" : "rgba(8,6,18,0.9)", color: assigned ? "#c4b5fd" : "#4b5563", cursor: "pointer", fontSize: 12, fontWeight: assigned ? 700 : 400 }}>
                                   💳 {b.nombre}
                                 </button>
                               );
                             })}
                           </div>
-                          {(emp.billeteras || []).length === 0 && <div style={{ fontSize: 11, color: "#4c3a70", fontStyle: "italic", marginTop: 4 }}>Sin billeteras asignadas — usa todas</div>}
+                          {(emp.billeteras || []).length === 0 && <div style={{ fontSize: 11, color: "#4b5563", fontStyle: "italic", marginTop: 4 }}>Sin billeteras asignadas — usa todas</div>}
                         </div>
                       )}
                     </div>))}
@@ -2177,8 +2194,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
               <div style={{ maxWidth: 560 }}>
                 <div style={S.card}>
                   <div style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600, marginBottom: 6 }}>📤 Destinos de Bajas</div>
-                  <p style={{ color: "#7c6fa0", fontSize: 12, marginBottom: 16 }}>CBU o alias a donde se envía el dinero.</p>
-                  {destinos.length > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>{destinos.map(d => (<div key={d.id} style={{ background: "#0a0a0f", border: "1px solid #92400e", borderRadius: 10, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}><div><div style={{ color: "#fbbf24", fontWeight: 700, fontSize: 14 }}>{d.alias}</div><div style={{ fontSize: 12, color: "#7c6fa0", marginTop: 3 }}>👤 {d.titular}</div><div style={{ fontSize: 12, color: "#a78bfa", fontFamily: "monospace", marginTop: 2 }}>{d.cbu}</div></div><button onClick={() => delDest(d.id)} style={S.danger}>🗑️</button></div>))}</div>)}
+                  <p style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>CBU o alias a donde se envía el dinero.</p>
+                  {destinos.length > 0 && (<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>{destinos.map(d => (<div key={d.id} style={{ background: "rgba(8,6,18,0.9)", border: "1px solid #92400e", borderRadius: 10, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}><div><div style={{ color: "#f59e0b", fontWeight: 700, fontSize: 14 }}>{d.alias}</div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>👤 {d.titular}</div><div style={{ fontSize: 12, color: "#a78bfa", fontFamily: "monospace", marginTop: 2 }}>{d.cbu}</div></div><button onClick={() => delDest(d.id)} style={S.danger}>🗑️</button></div>))}</div>)}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                     <div><label style={S.label}>Nombre</label><input type="text" value={newDest.alias} placeholder="Cuenta principal" onChange={e => setNewDest({ ...newDest, alias: e.target.value })} style={S.input} /></div>
                     <div><label style={S.label}>Titular</label><input type="text" value={newDest.titular} placeholder="Nombre titular" onChange={e => setNewDest({ ...newDest, titular: e.target.value })} style={S.input} /></div>
@@ -2192,11 +2209,11 @@ const OwnerDashboard = ({ session, onLogout }) => {
             {settingsTab === "sueldos" && (
               <div style={{ maxWidth: 680 }}>
                 <div style={{ ...S.card, marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: "#9f67ff", fontWeight: 700, marginBottom: 4 }}>💵 Configuración de sueldos</div>
-                  <div style={{ fontSize: 12, color: "#475569", marginBottom: 16 }}>Definí el valor hora y las horas por día de cada empleado. El sistema calcula el sueldo automáticamente.</div>
+                  <div style={{ fontSize: 13, color: "#a78bfa", fontWeight: 700, marginBottom: 4 }}>💵 Configuración de sueldos</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Definí el valor hora y las horas por día de cada empleado. El sistema calcula el sueldo automáticamente.</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {empleados.filter(e => e.activo).map(emp => (
-                      <div key={emp.id} style={{ background: "#07070f", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px" }}>
+                      <div key={emp.id} style={{ background: "#080612", border: "1px solid #1e1e38", borderRadius: 12, padding: "14px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                           <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14, minWidth: 140 }}>👤 {emp.nombre}</div>
                           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -2213,8 +2230,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
                                 onBlur={e => { db.updateEmpleado(emp.id, { horas_por_dia: +e.target.value || 8 }); }} />
                             </div>
                             <div style={{ textAlign: "right" }}>
-                              <div style={{ fontSize: 10, color: "#475569", marginBottom: 4 }}>Día / Semana / Mes</div>
-                              <div style={{ fontSize: 13, color: "#4ade80", fontWeight: 700 }}>
+                              <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>Día / Semana / Mes</div>
+                              <div style={{ fontSize: 13, color: "#10b981", fontWeight: 700 }}>
                                 {fmt((emp.valor_hora || 0) * (emp.horas_por_dia || 8))} · {fmt((emp.valor_hora || 0) * (emp.horas_por_dia || 8) * 6)} · {fmt((emp.valor_hora || 0) * (emp.horas_por_dia || 8) * 26)}
                               </div>
                             </div>
@@ -2225,7 +2242,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   </div>
                 </div>
                 <div style={S.card}>
-                  <div style={{ fontSize: 13, color: "#9f67ff", fontWeight: 700, marginBottom: 16 }}>🧮 Calcular liquidación</div>
+                  <div style={{ fontSize: 13, color: "#a78bfa", fontWeight: 700, marginBottom: 16 }}>🧮 Calcular liquidación</div>
                   <LiquidacionCalc empleados={empleados} />
                 </div>
               </div>
