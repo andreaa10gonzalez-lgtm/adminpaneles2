@@ -754,6 +754,37 @@ const EmployeeView = ({ session, onLogout }) => {
   );
 };
 
+// ─── NAV GROUP DROPDOWN ──────────────────────────────────────────────────────
+const NavGroup = ({ group, activeTab, setActiveTab }) => {
+  const [open, setOpen] = useState(false);
+  const isGroupActive = group.items.some(i => i.id === activeTab);
+  return (
+    <div style={{ position: "relative" }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}>
+      <button onClick={() => setActiveTab(group.items[0].id)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: "transparent", color: isGroupActive ? "#a78bfa" : "#94a3b8", borderBottom: isGroupActive ? "2px solid #7c3aed" : "2px solid transparent", whiteSpace: "nowrap", transition: "all 150ms ease", letterSpacing: "0.01em" }}>
+        {group.label}
+        <span style={{ fontSize: 9, opacity: 0.6, marginTop: 1 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "100%", left: 0, minWidth: 200, background: "rgba(10,8,20,0.97)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "0 12px 12px 12px", boxShadow: "0 16px 48px rgba(0,0,0,0.6)", zIndex: 200, padding: "6px", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
+          {group.items.map((item, idx) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button key={item.id} onClick={() => { setActiveTab(item.id); setOpen(false); }} style={{ display: "flex", flexDirection: "column", width: "100%", padding: "9px 12px", border: "none", cursor: "pointer", borderRadius: 8, background: isActive ? "rgba(124,58,237,0.15)" : "transparent", textAlign: "left", transition: "all 100ms ease", marginBottom: idx < group.items.length - 1 ? 2 : 0 }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: isActive ? "#a78bfa" : "#e2e8f0" }}>{item.label}</span>
+                <span style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{item.desc}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── LIQUIDACION CALC SUBCOMPONENT ───────────────────────────────────────────
 const LiquidacionCalc = ({ empleados }) => {
   const [liquidPeriodo, setLiquidPeriodo] = useState("mes");
@@ -1237,14 +1268,33 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
   if (!config) return <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 36 }}>🎰</div>Cargando...</div></div>;
 
-  const tabs = [
-    { id: "resumen", label: "📊 Resumen" }, { id: "dia", label: "📅 Día" },
-    { id: "caja", label: "💼 Caja" }, { id: "jugadores", label: "👥 Jugadores" },
-    { id: "bonos", label: "🎁 Bonos" }, { id: "bajas", label: "📤 Bajas" },
-    { id: "importar", label: "📂 Importar" }, { id: "cargar", label: editId ? "✏️ Editar" : "➕ Panel" },
-    { id: "historial", label: "📋 Historial" }, { id: "campana", label: "📣 Campaña" },
-    { id: "meses", label: "📆 Meses" }, { id: "ia", label: "🤖 IA Analista" }, { id: "empleados_hist", label: "👤 Empleados" }, { id: "ajustes", label: "⚙️ Ajustes" },
+  const NAV_GROUPS = [
+    { id: "inicio",      label: "Inicio",      icon: "◈", items: [
+      { id: "resumen", label: "Resumen", desc: "KPIs y gráficos del mes" },
+      { id: "dia",     label: "Día",     desc: "Resumen detallado por día" },
+    ]},
+    { id: "operaciones", label: "Operaciones", icon: "◆", items: [
+      { id: "caja",    label: "Caja",    desc: "Control de cajas y turnos" },
+      { id: "bonos",   label: "Bonos",   desc: "Bonos entregados" },
+      { id: "bajas",   label: "Bajas",   desc: "Retiros de caja" },
+      { id: "cargar",  label: editId ? "Editar entrada" : "Cargar panel", desc: "Ingresar datos diarios" },
+    ]},
+    { id: "datos",       label: "Datos",       icon: "◉", items: [
+      { id: "importar", label: "Importar",  desc: "Subir CSV del panel" },
+      { id: "historial", label: "Historial", desc: "Historial de entradas" },
+      { id: "meses",    label: "Meses",     desc: "Comparativa mensual" },
+    ]},
+    { id: "analisis",    label: "Análisis",    icon: "◎", items: [
+      { id: "jugadores", label: "Jugadores",  desc: "Base de jugadores" },
+      { id: "campana",   label: "Campaña",    desc: "Recuperación de jugadores" },
+      { id: "ia",        label: "IA Analista", desc: "Análisis inteligente" },
+    ]},
+    { id: "gestion",     label: "Gestión",     icon: "◇", items: [
+      { id: "empleados_hist", label: "Empleados", desc: "Historial por empleado" },
+      { id: "ajustes",        label: "Ajustes",   desc: "Configuración del panel" },
+    ]},
   ];
+  const activeGroup = NAV_GROUPS.find(g => g.items.some(i => i.id === activeTab));
 
   const CajaBajas = ({ formState, setFormState }) => {
     const items = formState.bajas || [];
@@ -1315,7 +1365,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
       <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
       {toast && <div style={{ position: "fixed", top: 20, right: 20, background: "#1e1b3a", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 20px", fontSize: 14, zIndex: 9999, maxWidth: 320 }}>{toast}</div>}
 
-      <div style={{ background: "linear-gradient(135deg,rgba(124,58,237,0.12),rgba(8,6,18,0.9))", borderBottom: "1px solid #1e1e38", padding: "16px 24px 0" }}>
+      <div style={{ background: "rgba(8,6,18,0.95)", borderBottom: "1px solid rgba(124,58,237,0.15)", padding: "14px 24px 0", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🎰</div><h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, background: "linear-gradient(90deg,#c084fc,#818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{config.nombre}</h1></div>
@@ -1352,8 +1402,22 @@ const OwnerDashboard = ({ session, onLogout }) => {
             <button onClick={onLogout} style={S.ghost}>Salir</button>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 2, overflowX: "auto" }}>
-          {tabs.map(t => <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ padding: "8px 11px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 500, borderRadius: "8px 8px 0 0", whiteSpace: "nowrap", background: activeTab === t.id ? "#080612" : "transparent", color: activeTab === t.id ? "#a78bfa" : "#64748b", borderBottom: activeTab === t.id ? "2px solid #9f67ff" : "2px solid transparent" }}>{t.label}</button>)}
+        <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+          {NAV_GROUPS.map(group => (
+            <NavGroup key={group.id} group={group} activeTab={activeTab} setActiveTab={setActiveTab} />
+          ))}
+          {activeGroup && (
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 2, paddingBottom: 4 }}>
+              {activeGroup.items.map(item => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button key={item.id} onClick={() => setActiveTab(item.id)} style={{ padding: "5px 11px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: isActive ? 700 : 500, borderRadius: 20, background: isActive ? "rgba(124,58,237,0.15)" : "transparent", color: isActive ? "#a78bfa" : "#64748b", transition: "all 150ms ease", whiteSpace: "nowrap" }}>
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
