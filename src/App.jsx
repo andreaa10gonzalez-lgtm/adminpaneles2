@@ -806,6 +806,50 @@ const LiquidacionCalc = ({ empleados }) => {
   );
 };
 
+// ─── DIA SUMMARY COMPONENT ───────────────────────────────────────────────────
+const DiaSummary = ({ day, fmt }) => {
+  const alertDay = day.dif !== null && Math.abs(day.dif) > 100;
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
+        {[{ label: "Neto del Panel", value: day.panelNeto !== null ? fmt(day.panelNeto) : "Sin datos", color: "#a78bfa", icon: "📊" }, { label: "Mov. Real Caja", value: day.dayTurnos.some(t => t.exists) ? fmt(day.totalMov) : "Sin datos", color: day.totalMov >= 0 ? "#4ade80" : "#f87171", icon: "💼" }, { label: "Diferencia", value: day.dif !== null ? fmt(day.dif) : "—", color: alertDay ? "#f87171" : "#4ade80", icon: alertDay ? "⚠️" : "✅" }].map(k => (
+          <div key={k.label} style={{ ...S.card, border: alertDay && k.label === "Diferencia" ? "1px solid #7f1d1d" : "1px solid #2a1f4a" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><div style={{ fontSize: 10, color: "#7c6fa0", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><span style={{ fontSize: 20 }}>{k.icon}</span></div>
+            <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {day.dayTurnos.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#475569", padding: 28 }}>No hay registros de caja para este día.</div> : day.dayTurnos.map(({ turnoLabel, caja, tI, tC, totalBajas, totalBonos, mov, empleado }) => (
+          <div key={caja?.turno_id || turnoLabel} style={{ ...S.card }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div><span style={{ fontWeight: 700, color: "#9f67ff", fontSize: 14 }}>{turnoLabel}</span>{empleado && <span style={{ fontSize: 12, color: "#475569", marginLeft: 10 }}>· 👤 {empleado}</span>}</div>
+              <div style={{ fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171", fontSize: 18 }}>{fmt(mov)}</div>
+            </div>
+            <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 12 }}>
+              {[{ label: "Apertura", v: tI, c: "#38bdf8" }, { label: "Cierre", v: tC, c: "#f87171" }].map(x => (<div key={x.label}><div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div><div style={{ color: x.c, fontWeight: 700, fontSize: 13 }}>{fmt(x.v)}</div></div>))}
+              {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ color: "#fbbf24", fontWeight: 700, fontSize: 13 }}>+{fmt(totalBajas)}</div></div>}
+              {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>-{fmt(totalBonos)}</div></div>}
+              {caja?.comentario_dueno && <div style={{ width: "100%" }}><div style={{ fontSize: 11, color: "#f59e0b", fontStyle: "italic" }}>💬 {caja.comentario_dueno}</div></div>}
+            </div>
+          </div>
+        ))}
+      </div>
+      {day.dayTurnos.some(t => t.exists) && (
+        <div style={{ ...S.card, marginTop: 16, background: alertDay ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (alertDay ? "#7f1d1d" : "#14532d") }}>
+          <div style={{ fontSize: 12, color: alertDay ? "#f87171" : "#4ade80", fontWeight: 600, marginBottom: 12 }}>Totales del día</div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+            {day.panelNeto !== null && <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Panel neto</div><div style={{ fontSize: 20, fontWeight: 800, color: "#a78bfa" }}>{fmt(day.panelNeto)}</div></div>}
+            <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Caja real</div><div style={{ fontSize: 20, fontWeight: 800, color: day.totalMov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(day.totalMov)}</div></div>
+            {day.dif !== null && <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Diferencia</div><div style={{ fontSize: 20, fontWeight: 800, color: alertDay ? "#f87171" : "#4ade80" }}>{day.dif > 0 ? "+" : ""}{fmt(day.dif)}</div></div>}
+          </div>
+          {alertDay && <div style={{ marginTop: 10, fontSize: 13, color: "#f87171", fontWeight: 600 }}>La caja no cierra con el panel</div>}
+        </div>
+      )}
+    </>
+  );
+};
+
 // ─── CAJA RESUMEN DUENO ──────────────────────────────────────────────────────
 const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, calcCaja }) => {
   if (!bills.some(b => cajaForm.cierre[b.id])) return null;
@@ -1306,47 +1350,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <input type="date" value={selectedDay} onChange={e => setSelectedDay(e.target.value)} style={{ ...S.input, width: "auto", padding: "7px 12px", fontSize: 12 }} />
               </div>
             </div>
-            {(() => {
-              const day = getDaySummary(selectedDay);
-              const alertDay = day.dif !== null && Math.abs(day.dif) > 100;
-              return (<>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
-                  {[{ label: "Neto del Panel", value: day.panelNeto !== null ? fmt(day.panelNeto) : "Sin datos", color: "#a78bfa", icon: "📊" }, { label: "Mov. Real Caja", value: day.dayTurnos.some(t => t.exists) ? fmt(day.totalMov) : "Sin datos", color: day.totalMov >= 0 ? "#4ade80" : "#f87171", icon: "💼" }, { label: "Diferencia", value: day.dif !== null ? fmt(day.dif) : "—", color: alertDay ? "#f87171" : "#4ade80", icon: alertDay ? "⚠️" : "✅" }].map(k => (
-                    <div key={k.label} style={{ ...S.card, border: alertDay && k.label === "Diferencia" ? "1px solid #7f1d1d" : "1px solid #2a1f4a" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}><div style={{ fontSize: 10, color: "#7c6fa0", textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div><span style={{ fontSize: 20 }}>{k.icon}</span></div>
-                      <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: k.color, margin: "8px 0 4px" }}>{k.value}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {day.dayTurnos.length === 0 ? <div style={{ ...S.card, textAlign: "center", color: "#475569", padding: 28 }}>No hay registros de caja para este día.</div> : day.dayTurnos.map(({ turnoLabel, caja, tI, tC, totalBajas, totalBonos, mov, empleado }) => (
-                    <div key={caja?.turno_id || turnoLabel} style={{ ...S.card }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div><span style={{ fontFamily: "'Inter',sans-serif", fontWeight: 700, color: "#9f67ff", fontSize: 14 }}>{turnoLabel}</span>{empleado && <span style={{ fontSize: 12, color: "#475569", marginLeft: 10 }}>· 👤 {empleado}</span>}</div>
-                        <div style={{ fontFamily: "'Inter',sans-serif", fontWeight: 800, color: mov >= 0 ? "#4ade80" : "#f87171", fontSize: 18 }}>{fmt(mov)}</div>
-                      </div>
-                      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 12 }}>
-                        {[{ label: "Apertura", v: tI, c: "#38bdf8" }, { label: "Cierre", v: tC, c: "#f87171" }].map(x => (<div key={x.label}><div style={{ fontSize: 10, color: "#475569" }}>{x.label}</div><div style={{ color: x.c, fontWeight: 700, fontSize: 13 }}>{fmt(x.v)}</div></div>))}
-                        {totalBajas > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bajas</div><div style={{ color: "#fbbf24", fontWeight: 700, fontSize: 13 }}>+{fmt(totalBajas)}</div></div>}
-                        {totalBonos > 0 && <div><div style={{ fontSize: 10, color: "#475569" }}>Bonos</div><div style={{ color: "#a78bfa", fontWeight: 700, fontSize: 13 }}>-{fmt(totalBonos)}</div></div>}
-                        {caja?.comentario_dueno && <div style={{ width: "100%" }}><div style={{ fontSize: 11, color: "#f59e0b", fontStyle: "italic" }}>💬 {caja.comentario_dueno}</div></div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {day.dayTurnos.some(t => t.exists) && (
-                  <div style={{ ...S.card, marginTop: 16, background: alertDay ? "linear-gradient(135deg,#2d0a0a,#1a0a00)" : "linear-gradient(135deg,#0a1f0a,#0a1200)", border: "1px solid " + (alertDay ? "#7f1d1d" : "#14532d") }}>
-                    <div style={{ fontSize: 12, color: alertDay ? "#f87171" : "#4ade80", fontWeight: 600, marginBottom: 12 }}>Totales del día</div>
-                    <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-                      {day.panelNeto !== null && <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Panel neto</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: "#a78bfa" }}>{fmt(day.panelNeto)}</div></div>}
-                      <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Caja real</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: day.totalMov >= 0 ? "#4ade80" : "#f87171" }}>{fmt(day.totalMov)}</div></div>
-                      {day.dif !== null && <div><div style={{ fontSize: 10, color: "#7c6fa0" }}>Diferencia</div><div style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, color: alertDay ? "#f87171" : "#4ade80" }}>{day.dif > 0 ? "+" : ""}{fmt(day.dif)}</div></div>}
-                    </div>
-                    {alertDay && <div style={{ marginTop: 10, fontSize: 13, color: "#f87171", fontWeight: 600 }}>⚠️ La caja no cierra con el panel</div>}
-                  </div>
-                )}
-              </>);
-            })()}
+            <DiaSummary day={getDaySummary(selectedDay)} fmt={fmt} />
           </div>
         )}
 
@@ -1369,7 +1373,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   <div style={{ marginBottom: 12 }}><label style={S.label}>Empleado</label>
                     {empleados.filter(e => e.activo).length > 0 ? (<select value={cajaForm.empleado} onChange={e => setCajaForm({ ...cajaForm, empleado: e.target.value, inicio: {}, cierre: {} })} style={{ ...S.input, appearance: "none" }}><option value="">— Seleccioná —</option>{empleados.filter(e => e.activo).map(e => <option key={e.id} value={e.nombre}>{e.nombre}{e.horario_inicio ? ` (${e.horario_inicio}${e.horario_fin ? " – " + e.horario_fin : ""})` : ""}</option>)}</select>) : (<button onClick={() => { setActiveTab("ajustes"); setSettingsTab("empleados"); }} style={{ width: "100%", background: "#0e0e1a", border: "1px dashed #4c1d95", color: "#a78bfa", padding: "10px", borderRadius: 10, cursor: "pointer", fontSize: 12 }}>+ Agregar empleados</button>)}
                   </div>
-                  {cajaForm.empleado && (() => { const emp = empleados.find(e => e.nombre === cajaForm.empleado); return emp?.horario_inicio ? <div style={{ background: "#1a0533", border: "1px solid #4c1d95", borderRadius: 9, padding: "8px 12px", fontSize: 12 }}><span style={{ color: "#475569" }}>⏰ </span><span style={{ color: "#c084fc", fontWeight: 700 }}>{emp.horario_inicio}{emp.horario_fin ? " – " + emp.horario_fin : ""}</span></div> : null; })()}
+                  {cajaForm.empleado && empleados.find(e => e.nombre === cajaForm.empleado)?.horario_inicio && (
+                    <div style={{ background: "#1a0533", border: "1px solid #4c1d95", borderRadius: 9, padding: "8px 12px", fontSize: 12 }}>
+                      <span style={{ color: "#475569" }}>⏰ </span>
+                      <span style={{ color: "#c084fc", fontWeight: 700 }}>
+                        {empleados.find(e => e.nombre === cajaForm.empleado)?.horario_inicio}
+                        {empleados.find(e => e.nombre === cajaForm.empleado)?.horario_fin ? " – " + empleados.find(e => e.nombre === cajaForm.empleado)?.horario_fin : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {editCajaData && (
