@@ -958,6 +958,122 @@ const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, ca
   );
 };
 
+// ─── MOVIMIENTOS ─────────────────────────────────────────────────────────────
+const Movimientos = ({ tid, supabase, fmt }) => {
+  const [txs, setTxs]         = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fecha, setFecha]     = useState(todayStr());
+  const [filter, setFilter]   = useState("all");
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("panel_transactions")
+      .select("*")
+      .eq("tenant_id", tid)
+      .eq("fecha", fecha)
+      .order("hora", { ascending: false });
+    setTxs(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [fecha]);
+
+  const filtered = filter === "all" ? txs : txs.filter(t => t.tipo === filter);
+  const totalCargas  = txs.filter(t => t.tipo === "carga").reduce((s, t) => s + (+t.monto || 0), 0);
+  const totalRetiros = txs.filter(t => t.tipo === "retiro").reduce((s, t) => s + (+t.monto || 0), 0);
+  const neto = totalCargas - totalRetiros;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>
+          📊 Movimientos capturados
+        </h2>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...S.input, width: "auto", padding: "8px 12px" }} />
+          <button onClick={load} style={{ ...S.ghost, padding: "8px 14px" }}>↺ Actualizar</button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "Total movimientos", value: txs.length, color: "#a78bfa" },
+          { label: "Cargas", value: fmt(totalCargas), color: "#10b981" },
+          { label: "Retiros", value: fmt(totalRetiros), color: "#f43f5e" },
+          { label: "Neto", value: fmt(neto), color: neto >= 0 ? "#10b981" : "#f43f5e" },
+        ].map(k => (
+          <div key={k.label} style={S.card}>
+            <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: k.color, fontFamily: "'Space Grotesk',sans-serif" }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Source info */}
+      <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 12, color: "#a78bfa", display: "flex", alignItems: "center", gap: 8 }}>
+        <span>🔌</span>
+        <span>Estos movimientos fueron capturados automáticamente por la extensión. Para agregar más, abrí la plataforma del casino con la extensión activa.</span>
+      </div>
+
+      {/* Filter */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {["all", "carga", "retiro"].map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{ ...S.subBtn(filter === f), fontSize: 11, padding: "6px 12px" }}>
+            {f === "all" ? "Todos" : f === "carga" ? "Cargas" : "Retiros"}
+          </button>
+        ))}
+        <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b", alignSelf: "center" }}>
+          {filtered.length} movimientos
+        </span>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>Cargando...</div>
+      ) : txs.length === 0 ? (
+        <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
+          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 8 }}>No hay movimientos para esta fecha.</div>
+          <div style={{ color: "#475569", fontSize: 12 }}>
+            Abrí la plataforma del casino con la extensión activa y los movimientos aparecerán acá automáticamente.
+          </div>
+        </div>
+      ) : (
+        <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "rgba(124,58,237,0.1)", borderBottom: "1px solid rgba(124,58,237,0.2)" }}>
+                  {["Hora", "Tipo", "Jugador", "Monto"].map(h => (
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((tx, i) => (
+                  <tr key={tx.id || i} style={{ borderBottom: "1px solid rgba(124,58,237,0.08)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                    <td style={{ padding: "9px 14px", color: "#64748b", fontFamily: "monospace" }}>{tx.hora?.slice(0,5) || "—"}</td>
+                    <td style={{ padding: "9px 14px" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: tx.tipo === "carga" ? "#10b981" : "#f43f5e", background: tx.tipo === "carga" ? "rgba(16,185,129,0.1)" : "rgba(244,63,94,0.1)", padding: "2px 8px", borderRadius: 10 }}>
+                        {tx.tipo === "carga" ? "Carga" : "Retiro"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "9px 14px", color: "#e2e8f0", fontWeight: 500 }}>{tx.jugador || "—"}</td>
+                    <td style={{ padding: "9px 14px", fontWeight: 700, color: tx.tipo === "carga" ? "#10b981" : "#f43f5e", fontFamily: "'Space Grotesk',sans-serif" }}>
+                      {tx.tipo === "retiro" ? "−" : ""}{fmt(+tx.monto || 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── MACROS SETTINGS ─────────────────────────────────────────────────────────
 const MacrosSettings = ({ config, saveConfig }) => {
   const macros = config.macros || { confirmacion: [], cbu: [], saludo: [], maxResponseMin: 5 };
@@ -1202,19 +1318,22 @@ const CommsMonitor = ({ tid, supabase, fmt, empleados, config }) => {
 };
 
 // ─── EXTENSION SETTINGS ──────────────────────────────────────────────────────
-const ExtensionSettings = ({ tid, supabase }) => {
-  const [copied, setCopied] = useState(false);
+const ExtensionSettings = ({ tid }) => {
+  const [copiedRole, setCopiedRole] = useState(null);
 
-  // Generate connection code: base64(tenantId|supabaseUrl|supabaseKey)
   const SUPA_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
   const SUPA_KEY = "sb_publishable_E64BlBT1wwUPfyrX0uxGyQ_oj_ItBCw";
-  const code = (() => { try { return btoa(`${tid}|${SUPA_URL}|${SUPA_KEY}`); } catch { return ""; } })();
 
-  const copy = () => {
+  const generateCode = (role) => {
+    try { return btoa(`${tid}|${SUPA_URL}|${SUPA_KEY}|${role}`); } catch { return ""; }
+  };
+
+  const copy = (role) => {
+    const code = generateCode(role);
     if (!code) return;
     navigator.clipboard.writeText(code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedRole(role);
+      setTimeout(() => setCopiedRole(null), 2000);
     });
   };
 
@@ -1225,7 +1344,7 @@ const ExtensionSettings = ({ tid, supabase }) => {
           <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🔌</div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#f1f5f9" }}>Extensión de Chrome / Edge</div>
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Conecta tu extensión con este panel</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Dos códigos según el rol — dueño o empleado</div>
           </div>
         </div>
 
@@ -1234,8 +1353,8 @@ const ExtensionSettings = ({ tid, supabase }) => {
           {[
             "Instalá la extensión en Chrome o Edge",
             "Hacé click en el ícono 🎰 en la barra del browser",
-            "Copiá el código de abajo y pegalo en la extensión",
-            "Hacé click en Conectar — listo",
+            "Copiá el código según el rol y pegalo en la extensión",
+            "Hacé click en Conectar y seleccioná el empleado",
           ].map((step, i) => (
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
               <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{i + 1}</div>
@@ -1244,28 +1363,37 @@ const ExtensionSettings = ({ tid, supabase }) => {
           ))}
         </div>
 
-        <div style={{ marginBottom: 8 }}>
-          <label style={S.label}>Tu código de conexión</label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input readOnly value={code || "Configurando..."} style={{ ...S.input, fontFamily: "monospace", fontSize: 11, color: "#a78bfa", flex: 1 }} />
-            <button onClick={copy} style={{ ...S.btn, padding: "11px 16px", whiteSpace: "nowrap", background: copied ? "linear-gradient(135deg,#10b981,#059669)" : undefined }}>
-              {copied ? "✓ Copiado" : "Copiar"}
-            </button>
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          {[
+            { role: "owner",    label: "🔑 Código Dueño",    desc: "Puede captar movimientos del casino", color: "#7c3aed" },
+            { role: "employee", label: "👤 Código Empleado", desc: "Solo monitoreo de WhatsApp/CRM",      color: "#64748b" },
+          ].map(({ role, label, desc, color }) => (
+            <div key={role} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid " + color + "40", borderRadius: 12, padding: "14px" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: 10, color: "#64748b", marginBottom: 10, lineHeight: 1.4 }}>{desc}</div>
+              <input readOnly value={generateCode(role)} style={{ ...S.input, fontFamily: "monospace", fontSize: 9, color: "#a78bfa", padding: "7px 8px", marginBottom: 8 }} />
+              <button onClick={() => copy(role)} style={{ ...S.btn, width: "100%", padding: "8px", fontSize: 12, background: copiedRole === role ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg," + color + ",#4f46e5)" }}>
+                {copiedRole === role ? "✓ Copiado" : "Copiar código"}
+              </button>
+            </div>
+          ))}
         </div>
-        <div style={{ fontSize: 11, color: "#64748b" }}>⚠ No compartas este código. Cualquiera que lo tenga puede conectarse a tu panel.</div>
+
+        <div style={{ fontSize: 11, color: "#64748b", background: "rgba(244,63,94,0.06)", border: "1px solid rgba(244,63,94,0.15)", borderRadius: 8, padding: "8px 12px" }}>
+          ⚠ No le des el código de dueño a los empleados — solo ellos pueden captar movimientos del casino.
+        </div>
       </div>
 
       <div style={{ ...S.card, marginTop: 14 }}>
-        <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 12 }}>¿Qué hace la extensión?</div>
+        <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 12 }}>¿Qué puede hacer cada rol?</div>
         {[
-          ["📱 WhatsApp Web", "Lee mensajes de clientes, mide tiempos de respuesta y detecta pedidos de carga/retiro"],
-          ["💬 CRM / Chat", "Se adapta a cualquier plataforma de atención y extrae datos automáticamente"],
-          ["🎰 Plataforma casino", "Lee transacciones directamente sin necesidad de exportar CSV"],
-          ["👥 Jugadores", "Construye automáticamente perfiles de tus jugadores más activos"],
+          ["🔑 Dueño",    "Puede captar movimientos del casino con un click. También monitorea WhatsApp y CRM."],
+          ["👤 Empleado", "Solo monitorea WhatsApp y CRM. No puede captar movimientos del casino."],
+          ["📱 WhatsApp", "Mide tiempos de respuesta, detecta pedidos de carga y retiro, genera alertas de demora."],
+          ["🎰 Casino",   "Lee las transacciones del día automáticamente sin exportar CSV."],
         ].map(([icon, desc]) => (
-          <div key={icon} style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid rgba(124,58,237,0.1)" }}>
-            <div style={{ fontSize: 18, width: 28, textAlign: "center" }}>{icon}</div>
+          <div key={icon} style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid rgba(124,58,237,0.08)" }}>
+            <div style={{ fontSize: 14, width: 28, flexShrink: 0, fontWeight: 700, color: "#a78bfa" }}>{icon}</div>
             <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>{desc}</div>
           </div>
         ))}
@@ -1810,9 +1938,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
       { id: "cargar",  label: editId ? "Editar entrada" : "Cargar panel", desc: "Ingresar datos diarios" },
     ]},
     { id: "datos",       label: "Datos",       icon: "◉", items: [
-      { id: "importar", label: "Importar",  desc: "Subir CSV del panel" },
-      { id: "historial", label: "Historial", desc: "Historial de entradas" },
-      { id: "meses",    label: "Meses",     desc: "Comparativa mensual" },
+      { id: "movimientos", label: "Movimientos", desc: "Transacciones capturadas por la extensión" },
+      { id: "importar",    label: "Importar",    desc: "Subir CSV del panel" },
+      { id: "historial",   label: "Historial",   desc: "Historial de entradas" },
+      { id: "meses",       label: "Meses",       desc: "Comparativa mensual" },
     ]},
     { id: "analisis",    label: "Análisis",    icon: "◎", items: [
       { id: "jugadores", label: "Jugadores",  desc: "Base de jugadores" },
@@ -2267,6 +2396,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
               {todasBajas.length === 0 ? <div style={{ color: "#4b5563", fontSize: 13 }}>No hay bajas todavía.</div> : todasBajas.map((b, i) => { const bill = bills.find(x => x.id === b.billeteraId); const dest = destinos.find(d => d.id === b.destinoId); return (<div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1a1530", gap: 10, flexWrap: "wrap" }}><div><div style={{ display: "flex", gap: 10 }}><span style={{ color: "#a78bfa", fontSize: 12, fontWeight: 600 }}>{new Date(b.fecha + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</span><span style={{ fontSize: 11, color: "#c4b5fd" }}>👤 {b.empleado}</span></div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}><span style={{ color: "#38bdf8" }}>💳 {bill?.nombre || "—"}</span>{dest && <span style={{ marginLeft: 8 }}>→ <span style={{ color: "#f59e0b" }}>{dest.alias}</span></span>}</div></div><div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 18, fontWeight: 800, color: "#f59e0b" }}>{fmt(+b.monto || 0)}</div></div>); })}
             </div>
           </div>
+        )}
+
+        {activeTab === "movimientos" && (
+          <Movimientos tid={tid} supabase={supabase} fmt={fmt} />
         )}
 
         {activeTab === "importar" && (
