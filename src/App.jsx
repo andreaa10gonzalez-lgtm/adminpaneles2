@@ -958,6 +958,249 @@ const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, ca
   );
 };
 
+// ─── MACROS SETTINGS ─────────────────────────────────────────────────────────
+const MacrosSettings = ({ config, saveConfig }) => {
+  const macros = config.macros || { confirmacion: [], cbu: [], saludo: [], maxResponseMin: 5 };
+  const [form, setForm] = useState({
+    confirmacion: (macros.confirmacion || []).join("
+"),
+    cbu:          (macros.cbu || []).join("
+"),
+    saludo:       (macros.saludo || []).join("
+"),
+    maxResponseMin: macros.maxResponseMin || 5,
+  });
+
+  const save = () => {
+    saveConfig({
+      macros: {
+        confirmacion:    form.confirmacion.split("
+").map(s => s.trim()).filter(Boolean),
+        cbu:             form.cbu.split("
+").map(s => s.trim()).filter(Boolean),
+        saludo:          form.saludo.split("
+").map(s => s.trim()).filter(Boolean),
+        maxResponseMin:  parseInt(form.maxResponseMin) || 5,
+      }
+    });
+  };
+
+  return (
+    <div style={{ maxWidth: 520 }}>
+      <div style={S.card}>
+        <div style={{ fontSize: 13, color: "#a78bfa", fontWeight: 700, marginBottom: 4 }}>💬 Configuración de macros</div>
+        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 18 }}>
+          Escribí una frase por línea. La extensión las usará para detectar con certeza cuándo el empleado respondió.
+        </div>
+
+        {[
+          { key: "confirmacion", label: "✅ Frases de confirmación de carga", ph: "fichas cargadas
+listo
+ya está
+acreditado" },
+          { key: "cbu",          label: "🏦 Frases al mandar CBU / comprobante", ph: "te paso el cbu
+transferí a
+alias:" },
+          { key: "saludo",       label: "👋 Frases de cierre / despedida", ph: "buen juego
+suerte
+gracias por jugar" },
+        ].map(f => (
+          <div key={f.key} style={{ marginBottom: 16 }}>
+            <label style={S.label}>{f.label}</label>
+            <textarea
+              value={form[f.key]}
+              onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+              placeholder={f.ph}
+              rows={3}
+              style={{ ...S.input, resize: "vertical", lineHeight: 1.6, fontFamily: "monospace", fontSize: 12 }}
+            />
+          </div>
+        ))}
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={S.label}>⏱ Tiempo máximo de respuesta (minutos)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <input
+              type="number" min="1" max="60"
+              value={form.maxResponseMin}
+              onChange={e => setForm({ ...form, maxResponseMin: e.target.value })}
+              style={{ ...S.input, width: 100 }}
+            />
+            <span style={{ fontSize: 12, color: "#64748b" }}>
+              Si un cliente espera más de este tiempo sin respuesta, el dueño recibe una alerta.
+            </span>
+          </div>
+        </div>
+
+        <button onClick={save} style={S.btn}>Guardar macros</button>
+      </div>
+
+      <div style={{ ...S.card, marginTop: 14 }}>
+        <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 10 }}>¿Cómo funcionan los macros?</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.7 }}>
+          Cuando un cliente pide una carga o retiro, la extensión abre un temporizador. Si el empleado responde con alguna de estas frases, el pedido se marca como <b style={{ color: "#10b981" }}>confirmado con certeza</b>. Si responde con otras palabras, se marca como <b style={{ color: "#f59e0b" }}>probable respuesta</b>. Si no responde en el tiempo configurado, te llega una <b style={{ color: "#f43f5e" }}>alerta</b>.
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── COMMS MONITOR ────────────────────────────────────────────────────────────
+const CommsMonitor = ({ tid, supabase, fmt, empleados, config }) => {
+  const [alerts, setAlerts] = useState([]);
+  const [stats, setStats]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const today = new Date().toISOString().slice(0, 10);
+
+      const [{ data: alertData }, { data: msgData }] = await Promise.all([
+        supabase.from("ext_alerts").select("*").eq("tenant_id", tid).eq("leida", false).order("created_at", { ascending: false }),
+        supabase.from("ext_messages").select("*").eq("tenant_id", tid).gte("timestamp", today + "T00:00:00").order("timestamp", { ascending: false }),
+      ]);
+
+      setAlerts(alertData || []);
+
+      // Build stats per employee
+      const msgs = msgData || [];
+      const empStats = {};
+      msgs.forEach(m => {
+        const emp = m.empleado_nombre || "Sin asignar";
+        if (!empStats[emp]) empStats[emp] = { nombre: emp, mensajes: 0, respondidos: 0, avgResponse: [], pendientes: 0, cargas: 0, retiros: 0 };
+        empStats[emp].mensajes++;
+        if (m.response_time_seconds > 0) empStats[emp].avgResponse.push(m.response_time_seconds);
+        if (m.resolution === "completado" || m.resolution === "cbu_enviado") empStats[emp].respondidos++;
+        if (m.type === "incoming" && m.detectedAction === "carga") empStats[emp].cargas++;
+        if (m.type === "incoming" && m.detectedAction === "retiro") empStats[emp].retiros++;
+      });
+
+      setStats(Object.values(empStats).map(e => ({
+        ...e,
+        avgResponseSec: e.avgResponse.length ? Math.round(e.avgResponse.reduce((a,b) => a+b,0) / e.avgResponse.length) : null,
+      })));
+      setLoading(false);
+    };
+
+    load();
+    const interval = setInterval(load, 30000); // refresh every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  const markRead = async (id) => {
+    await supabase.from("ext_alerts").update({ leida: true }).eq("id", id);
+    setAlerts(alerts.filter(a => a.id !== id));
+  };
+
+  const markAllRead = async () => {
+    await supabase.from("ext_alerts").update({ leida: true }).eq("tenant_id", tid).eq("leida", false);
+    setAlerts([]);
+  };
+
+  const maxMin = config?.macros?.maxResponseMin || 5;
+
+  const formatTime = (secs) => {
+    if (!secs) return "—";
+    if (secs < 60) return `${secs}s`;
+    if (secs < 3600) return `${Math.floor(secs/60)}m ${secs%60}s`;
+    return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`;
+  };
+
+  const responseColor = (secs) => {
+    if (!secs) return "#64748b";
+    const mins = secs / 60;
+    if (mins <= maxMin * 0.5) return "#10b981";
+    if (mins <= maxMin) return "#f59e0b";
+    return "#f43f5e";
+  };
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>Cargando monitor...</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>
+          📡 Monitor en tiempo real
+        </h2>
+        <div style={{ fontSize: 11, color: "#64748b" }}>Se actualiza cada 30 segundos · Tiempo máx. configurado: <b style={{ color: "#a78bfa" }}>{maxMin} min</b></div>
+      </div>
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: "#f43f5e", fontWeight: 700 }}>🚨 {alerts.length} alerta{alerts.length > 1 ? "s" : ""} sin resolver</div>
+            <button onClick={markAllRead} style={{ ...S.ghost, fontSize: 11, padding: "5px 12px" }}>Marcar todas como leídas</button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {alerts.map(a => (
+              <div key={a.id} style={{ background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.25)", borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#f43f5e" }}>
+                    ⚠ {a.empleado_nombre} — cliente esperando {a.minutos_espera} min sin respuesta
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
+                    {new Date(a.created_at).toLocaleString("es-AR", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}
+                  </div>
+                </div>
+                <button onClick={() => markRead(a.id)} style={{ ...S.ghost, fontSize: 11, padding: "5px 10px", whiteSpace: "nowrap" }}>✓ Listo</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Employee stats */}
+      {stats.length === 0 ? (
+        <div style={{ ...S.card, textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📡</div>
+          <div style={{ color: "#64748b", fontSize: 13 }}>No hay actividad hoy todavía. La extensión empezará a registrar cuando el empleado abra WhatsApp o su CRM.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 14 }}>
+          {stats.map(emp => {
+            const hasAlert = alerts.some(a => a.empleado_nombre === emp.nombre);
+            return (
+              <div key={emp.nombre} style={{ ...S.card, border: hasAlert ? "1px solid rgba(244,63,94,0.4)" : "1px solid rgba(124,58,237,0.15)", background: hasAlert ? "rgba(244,63,94,0.04)" : undefined }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👤</div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>{emp.nombre}</div>
+                      <div style={{ fontSize: 10, color: "#64748b" }}>{emp.mensajes} mensajes hoy</div>
+                    </div>
+                  </div>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: hasAlert ? "#f43f5e" : "#10b981", boxShadow: "0 0 8px " + (hasAlert ? "#f43f5e" : "#10b981") }} />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[
+                    { label: "Resp. promedio", value: formatTime(emp.avgResponseSec), color: responseColor(emp.avgResponseSec) },
+                    { label: "Respondidos", value: emp.respondidos, color: "#10b981" },
+                    { label: "Cargas atendidas", value: emp.cargas, color: "#10b981" },
+                    { label: "Retiros atendidos", value: emp.retiros, color: "#f43f5e" },
+                  ].map(k => (
+                    <div key={k.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "8px 10px" }}>
+                      <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3 }}>{k.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: k.color, fontFamily: "'Space Grotesk',sans-serif" }}>{k.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {hasAlert && (
+                  <div style={{ marginTop: 10, background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.2)", borderRadius: 8, padding: "7px 10px", fontSize: 11, color: "#f43f5e", fontWeight: 600 }}>
+                    🚨 Cliente esperando respuesta
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── EXTENSION SETTINGS ──────────────────────────────────────────────────────
 const ExtensionSettings = ({ tid, supabase }) => {
   const [copied, setCopied] = useState(false);
@@ -1581,6 +1824,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
       { id: "ajustes",        label: "Ajustes",   desc: "Configuración del panel" },
     ]},
     { id: "comms",        label: "Comunicaciones", icon: "◐", items: [
+      { id: "comms_monitor",   label: "Monitor",    desc: "Estado en tiempo real por empleado" },
       { id: "comms_mensajes",  label: "Mensajes",   desc: "Mensajes y tiempos de respuesta" },
       { id: "comms_jugadores", label: "Jugadores",  desc: "Base de jugadores detectados" },
     ]},
@@ -2431,7 +2675,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
           <div>
             <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#c4b5fd" }}>⚙️ Ajustes</h2>
             <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-              {[{ id: "billeteras", label: "💳 Billeteras" }, { id: "empleados", label: "👥 Empleados" }, { id: "sueldos", label: "💵 Sueldos" }, { id: "bajas", label: "📤 Destinos Bajas" }, { id: "negocio", label: "🏷️ Negocio" }, { id: "extension", label: "🔌 Extensión" }].map(t => (<button key={t.id} onClick={() => setSettingsTab(t.id)} style={S.subBtn(settingsTab === t.id)}>{t.label}</button>))}
+              {[{ id: "billeteras", label: "💳 Billeteras" }, { id: "empleados", label: "👥 Empleados" }, { id: "sueldos", label: "💵 Sueldos" }, { id: "bajas", label: "📤 Destinos Bajas" }, { id: "negocio", label: "🏷️ Negocio" }, { id: "extension", label: "🔌 Extensión" }, { id: "macros", label: "💬 Macros" }].map(t => (<button key={t.id} onClick={() => setSettingsTab(t.id)} style={S.subBtn(settingsTab === t.id)}>{t.label}</button>))}
             </div>
 
             {settingsTab === "billeteras" && (
@@ -2618,7 +2862,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
             {settingsTab === "extension" && (
               <ExtensionSettings tid={tid} supabase={supabase} />
             )}
+
+            {settingsTab === "macros" && (
+              <MacrosSettings config={config} saveConfig={saveConfig} />
+            )}
           </div>
+        )}
+
+        {activeTab === "comms_monitor" && (
+          <CommsMonitor tid={tid} supabase={supabase} fmt={fmt} empleados={empleados} config={config} saveConfig={saveConfig} />
         )}
 
         {activeTab === "comms_mensajes" && (
