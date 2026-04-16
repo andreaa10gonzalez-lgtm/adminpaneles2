@@ -1653,9 +1653,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
       db.getAllTransactions(tid),
     ]);
     setConfig(cfg || { nombre: session.nombre, billeteras: [], destinos_bajas: [] });
-    setEntries(ents); setJugadores(jugs); setCampaign(camp); setEmpleados(emps); setCajas(cajs);
+    setJugadores(jugs); setCampaign(camp); setEmpleados(emps); setCajas(cajs);
     setNotificaciones(notifs || []);
     setJugadorStats(stats || []);
+
     // Group transactions by fecha for fast lookup
     const byFecha = {};
     (allTxs || []).forEach(t => {
@@ -1663,6 +1664,34 @@ const OwnerDashboard = ({ session, onLogout }) => {
       byFecha[t.fecha].push(t);
     });
     setAllTxsByFecha(byFecha);
+
+    // Merge panel_transactions into entries for days missing from panel_entries
+    const entryFechas = new Set((ents || []).map(e => e.fecha));
+    const mergedEnts = [...(ents || [])];
+    Object.entries(byFecha).forEach(([fecha, txs]) => {
+      const existing = mergedEnts.find(e => e.fecha === fecha);
+      const txCargas  = Math.round(txs.filter(t => t.tipo === "carga").reduce((s, t) => s + (+t.monto || 0), 0));
+      const txRetiros = Math.round(txs.filter(t => t.tipo === "retiro").reduce((s, t) => s + (+t.monto || 0), 0));
+      const jugSet    = new Set(txs.map(t => t.jugador).filter(Boolean));
+      if (existing) {
+        // Day exists but has no data — fill from transactions
+        if (existing.cargas === 0 && existing.retiros === 0 && txCargas > 0) {
+          existing.cargas  = txCargas;
+          existing.retiros = txRetiros;
+          existing.jugadores_unicos = existing.jugadores_unicos || jugSet.size;
+        }
+      } else {
+        // Day missing — create synthetic entry from transactions
+        mergedEnts.push({
+          id: "synthetic_" + fecha, tenant_id: tid, fecha,
+          cargas: txCargas, retiros: txRetiros,
+          jugadores_unicos: jugSet.size, jugadores_nuevos: 0,
+          notas: txs.length + " mov · " + jugSet.size + " jugadores (extensión)",
+          _fromExtension: true,
+        });
+      }
+    });
+    setEntries(mergedEnts.sort((a, b) => a.fecha.localeCompare(b.fecha)));
   };
 
   useEffect(() => { loadAll(); }, []);
