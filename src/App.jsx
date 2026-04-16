@@ -1077,25 +1077,20 @@ const Movimientos = ({ tid, supabase, fmt }) => {
 // ─── MACROS SETTINGS ─────────────────────────────────────────────────────────
 const MacrosSettings = ({ config, saveConfig }) => {
   const macros = config.macros || { confirmacion: [], cbu: [], saludo: [], maxResponseMin: 5 };
+  const NL = String.fromCharCode(10);
   const [form, setForm] = useState({
-    confirmacion: (macros.confirmacion || []).join("
-"),
-    cbu:          (macros.cbu || []).join("
-"),
-    saludo:       (macros.saludo || []).join("
-"),
+    confirmacion: (macros.confirmacion || []).join(NL),
+    cbu:          (macros.cbu || []).join(NL),
+    saludo:       (macros.saludo || []).join(NL),
     maxResponseMin: macros.maxResponseMin || 5,
   });
 
   const save = () => {
     saveConfig({
       macros: {
-        confirmacion:    form.confirmacion.split("
-").map(s => s.trim()).filter(Boolean),
-        cbu:             form.cbu.split("
-").map(s => s.trim()).filter(Boolean),
-        saludo:          form.saludo.split("
-").map(s => s.trim()).filter(Boolean),
+        confirmacion:    form.confirmacion.split(NL).map(s => s.trim()).filter(Boolean),
+        cbu:             form.cbu.split(NL).map(s => s.trim()).filter(Boolean),
+        saludo:          form.saludo.split(NL).map(s => s.trim()).filter(Boolean),
         maxResponseMin:  parseInt(form.maxResponseMin) || 5,
       }
     });
