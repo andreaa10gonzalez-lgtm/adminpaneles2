@@ -1105,16 +1105,9 @@ const MacrosSettings = ({ config, saveConfig }) => {
         </div>
 
         {[
-          { key: "confirmacion", label: "✅ Frases de confirmación de carga", ph: "fichas cargadas
-listo
-ya está
-acreditado" },
-          { key: "cbu",          label: "🏦 Frases al mandar CBU / comprobante", ph: "te paso el cbu
-transferí a
-alias:" },
-          { key: "saludo",       label: "👋 Frases de cierre / despedida", ph: "buen juego
-suerte
-gracias por jugar" },
+          { key: "confirmacion", label: "Frases de confirmacion de carga", ph: "fichas cargadas / listo / ya esta / acreditado" },
+          { key: "cbu",          label: "Frases al mandar CBU / comprobante", ph: "te paso el cbu / transferi a / alias:" },
+          { key: "saludo",       label: "Frases de cierre / despedida", ph: "buen juego / suerte / gracias por jugar" },
         ].map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>
             <label style={S.label}>{f.label}</label>
