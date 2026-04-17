@@ -1241,7 +1241,7 @@ const CommsMonitor = ({ tid, supabase, fmt, empleados, config }) => {
               <div key={a.id} style={{ background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.25)", borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 13, color: "#f43f5e" }}>
-                    ⚠ {a.empleado_nombre} — cliente esperando {a.minutos_espera} min sin respuesta
+                    ⚠ {a.message || ((a.chat_id || a.empleado_nombre) + " — esperando " + a.minutos_espera + " min sin respuesta")}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
                     {new Date(a.created_at).toLocaleString("es-AR", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}
@@ -1961,18 +1961,23 @@ const OwnerDashboard = ({ session, onLogout }) => {
       { id: "meses",       label: "Meses",       desc: "Comparativa mensual" },
     ]},
     { id: "analisis",    label: "Análisis",    icon: "◎", items: [
-      { id: "jugadores", label: "Jugadores",  desc: "Base de jugadores" },
-      { id: "campana",   label: "Campaña",    desc: "Recuperación de jugadores" },
-      { id: "ia",        label: "IA Analista", desc: "Análisis inteligente" },
+      { id: "jugadores",   label: "Jugadores",   desc: "Base de jugadores" },
+      { id: "ranking",     label: "Ranking",     desc: "Jugadores más activos del mes" },
+      { id: "inactivos",   label: "Inactivos",   desc: "Jugadores sin actividad reciente" },
+      { id: "horarios",    label: "Horarios",    desc: "Pico de cargas por hora" },
+      { id: "campana",     label: "Campaña",     desc: "Recuperación de jugadores" },
+      { id: "ia",          label: "IA Analista", desc: "Análisis inteligente" },
     ]},
     { id: "gestion",     label: "Gestión",     icon: "◇", items: [
-      { id: "empleados_hist", label: "Empleados", desc: "Historial por empleado" },
-      { id: "ajustes",        label: "Ajustes",   desc: "Configuración del panel" },
+      { id: "empleados_hist", label: "Empleados",   desc: "Historial por empleado" },
+      { id: "liquidacion",    label: "Liquidación", desc: "Calculadora de sueldos" },
+      { id: "ajustes",        label: "Ajustes",     desc: "Configuración del panel" },
     ]},
     { id: "comms",        label: "Comunicaciones", icon: "◐", items: [
       { id: "comms_monitor",   label: "Monitor",    desc: "Estado en tiempo real por empleado" },
       { id: "comms_mensajes",  label: "Mensajes",   desc: "Mensajes y tiempos de respuesta" },
       { id: "comms_jugadores", label: "Jugadores",  desc: "Base de jugadores detectados" },
+      { id: "rendimiento",     label: "Rendimiento", desc: "Tiempo de respuesta por empleado" },
     ]},
   ];
   const activeGroup = NAV_GROUPS.find(g => g.items.some(i => i.id === activeTab));
@@ -2751,6 +2756,238 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <div style={{ color: "#64748b", fontSize: 13 }}>Presioná "Analizar" para obtener un diagnóstico de tu operación,<br/>o escribí una pregunta específica.</div>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "ranking" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>🏆</div>
+              <div>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#f59e0b" }}>Ranking de Jugadores</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Top jugadores del mes por volumen de cargas</p>
+              </div>
+            </div>
+            {(() => {
+              const txsMes = Object.entries(allTxsByFecha)
+                .filter(([f]) => f.startsWith(cmk()))
+                .flatMap(([, txs]) => txs);
+              const byJugador = {};
+              txsMes.forEach(t => {
+                if (!t.jugador) return;
+                if (!byJugador[t.jugador]) byJugador[t.jugador] = { nombre: t.jugador, cargas: 0, retiros: 0, cant: 0, maxCarga: 0 };
+                if (t.tipo === "carga") {
+                  byJugador[t.jugador].cargas += +t.monto || 0;
+                  byJugador[t.jugador].cant++;
+                  byJugador[t.jugador].maxCarga = Math.max(byJugador[t.jugador].maxCarga, +t.monto || 0);
+                }
+                if (t.tipo === "retiro") byJugador[t.jugador].retiros += +t.monto || 0;
+              });
+              const ranking = Object.values(byJugador).sort((a,b) => b.cargas - a.cargas).slice(0, 20);
+              const maxCargas = ranking[0]?.cargas || 1;
+              if (!ranking.length) return <div style={{ ...S.card, textAlign:"center", color:"#64748b", padding:40 }}>No hay datos de transacciones este mes.</div>;
+              return (
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {ranking.map((j, idx) => (
+                    <div key={j.nombre} style={{ ...S.card, display:"flex", alignItems:"center", gap:14, padding:"12px 16px" }}>
+                      <div style={{ width:32,height:32,borderRadius:10,background:idx===0?"linear-gradient(135deg,#f59e0b,#d97706)":idx===1?"linear-gradient(135deg,#94a3b8,#64748b)":idx===2?"linear-gradient(135deg,#b45309,#92400e)":"rgba(124,58,237,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:"#fff",flexShrink:0 }}>
+                        {idx+1}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:700, fontSize:13, color:"#f1f5f9", marginBottom:4 }}>{j.nombre}</div>
+                        <div style={{ background:"rgba(124,58,237,0.1)", borderRadius:100, height:6 }}>
+                          <div style={{ background:"linear-gradient(90deg,#f59e0b,#fbbf24)", borderRadius:100, height:6, width:((j.cargas/maxCargas)*100)+"%", transition:"width 0.8s ease" }} />
+                        </div>
+                      </div>
+                      <div style={{ textAlign:"right", flexShrink:0 }}>
+                        <div style={{ color:"#10b981", fontWeight:700, fontSize:13 }}>{fmt(j.cargas)}</div>
+                        <div style={{ color:"#64748b", fontSize:11 }}>{j.cant} cargas · máx {fmt(j.maxCarga)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {activeTab === "inactivos" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#f43f5e,#be123c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>😴</div>
+              <div>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#f43f5e" }}>Jugadores Inactivos</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Sin actividad en los últimos 15 días — candidatos a recuperación</p>
+              </div>
+            </div>
+            {(() => {
+              const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 15);
+              const cutoffStr = cutoff.toISOString().slice(0,10);
+              const active15 = new Set(
+                Object.entries(allTxsByFecha)
+                  .filter(([f]) => f >= cutoffStr)
+                  .flatMap(([,txs]) => txs.map(t => t.jugador))
+                  .filter(Boolean)
+              );
+              const allJug = new Set(
+                Object.values(allTxsByFecha).flatMap(txs => txs.map(t => t.jugador)).filter(Boolean)
+              );
+              const inactivos = [...allJug].filter(j => !active15.has(j)).sort();
+              if (!inactivos.length) return <div style={{ ...S.card, textAlign:"center", color:"#10b981", padding:40 }}>✓ Todos los jugadores tuvieron actividad reciente.</div>;
+              return (
+                <div>
+                  <div style={{ ...S.card, marginBottom:16, background:"rgba(244,63,94,0.05)", borderColor:"rgba(244,63,94,0.2)" }}>
+                    <div style={{ fontSize:28,fontWeight:800,color:"#f43f5e" }}>{inactivos.length}</div>
+                    <div style={{ color:"#64748b",fontSize:12 }}>jugadores sin actividad en los últimos 15 días</div>
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:8 }}>
+                    {inactivos.map(j => (
+                      <div key={j} style={{ ...S.card, padding:"10px 14px", fontSize:12, color:"#94a3b8" }}>
+                        <div style={{ fontSize:16, marginBottom:4 }}>😴</div>
+                        <div style={{ fontWeight:600, color:"#f1f5f9" }}>{j}</div>
+                        <div style={{ color:"#f43f5e", fontSize:11, marginTop:4 }}>+15 días sin actividad</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {activeTab === "horarios" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#06b6d4,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>⏰</div>
+              <div>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#06b6d4" }}>Horarios Pico</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>A qué hora entran más cargas este mes</p>
+              </div>
+            </div>
+            {(() => {
+              const txsMes = Object.entries(allTxsByFecha)
+                .filter(([f]) => f.startsWith(cmk()))
+                .flatMap(([,txs]) => txs.filter(t => t.tipo === "carga"));
+              const byHora = Array(24).fill(0).map((_, h) => ({ hora: h + ":00", cargas: 0, monto: 0 }));
+              txsMes.forEach(t => {
+                const h = parseInt((t.hora || "00:00").split(":")[0]) || 0;
+                byHora[h].cargas++;
+                byHora[h].monto += +t.monto || 0;
+              });
+              const maxCargas = Math.max(...byHora.map(h => h.cargas), 1);
+              const topHoras = [...byHora].sort((a,b) => b.cargas - a.cargas).slice(0,3);
+              return (
+                <div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:16 }}>
+                    {topHoras.map((h,i) => (
+                      <div key={h.hora} style={{ ...S.card, textAlign:"center", background:i===0?"rgba(6,182,212,0.1)":"rgba(15,13,31,0.85)", borderColor:i===0?"rgba(6,182,212,0.3)":undefined }}>
+                        <div style={{ fontSize:22 }}>{i===0?"🥇":i===1?"🥈":"🥉"}</div>
+                        <div style={{ fontSize:20,fontWeight:800,color:"#06b6d4",margin:"4px 0" }}>{h.hora}</div>
+                        <div style={{ fontSize:12,color:"#64748b" }}>{h.cargas} cargas</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ ...S.card }}>
+                    <div style={{ fontSize:12,color:"#64748b",marginBottom:12,fontWeight:600 }}>Cargas por hora del día</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={byHora}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(124,58,237,0.1)" />
+                        <XAxis dataKey="hora" tick={{ fill:"#64748b",fontSize:9 }} interval={2} />
+                        <YAxis tick={{ fill:"#64748b",fontSize:10 }} allowDecimals={false} />
+                        <Tooltip contentStyle={{ background:"rgba(15,13,31,0.95)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:10 }} />
+                        <Bar dataKey="cargas" fill="#06b6d4" radius={[4,4,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {activeTab === "liquidacion" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>💰</div>
+              <div>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#10b981" }}>Calculadora de Liquidación</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Calculá el sueldo de cada empleado según sus turnos del mes</p>
+              </div>
+            </div>
+            {(() => {
+              const mesActual = cmk();
+              const turnosMes = cajaHistorial.filter(c => c.fecha?.startsWith(mesActual) && c.cerrado);
+              const byEmp = {};
+              turnosMes.forEach(c => {
+                if (!byEmp[c.empleado_nombre]) byEmp[c.empleado_nombre] = { turnos:0, horas:0, diferencias:0, mov:0 };
+                byEmp[c.empleado_nombre].turnos++;
+                byEmp[c.empleado_nombre].mov += c.mov || 0;
+                byEmp[c.empleado_nombre].diferencias += Math.abs(c.diferencia || 0);
+                if (c.hora_inicio && c.hora_cierre) {
+                  const [h1,m1] = c.hora_inicio.split(":").map(Number);
+                  const [h2,m2] = c.hora_cierre.split(":").map(Number);
+                  let mins = (h2*60+m2) - (h1*60+m1);
+                  if (mins < 0) mins += 24*60;
+                  byEmp[c.empleado_nombre].horas += mins/60;
+                }
+              });
+              const emps = Object.entries(byEmp);
+              if (!emps.length) return <div style={{ ...S.card, textAlign:"center", color:"#64748b", padding:40 }}>No hay turnos cerrados este mes todavía.</div>;
+              return (
+                <div>
+                  <div style={{ ...S.card, marginBottom:16, background:"rgba(16,185,129,0.05)", borderColor:"rgba(16,185,129,0.2)", fontSize:12, color:"#64748b" }}>
+                    💡 El sueldo se calcula según la configuración en Ajustes → Sueldos. Podés ajustar el valor por turno o por hora desde ahí.
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    {emps.map(([nombre, data]) => {
+                      const emp = empleados.find(e => e.nombre === nombre);
+                      const sueldo = emp?.sueldo_base || 0;
+                      const porTurno = emp?.monto_por_turno || 0;
+                      const total = sueldo + (porTurno * data.turnos);
+                      return (
+                        <div key={nombre} style={{ ...S.card }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                            <div>
+                              <div style={{ fontWeight:700, fontSize:15, color:"#f1f5f9" }}>{nombre}</div>
+                              <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{data.turnos} turnos · {data.horas.toFixed(1)} hs · {data.mov} movimientos</div>
+                            </div>
+                            <div style={{ textAlign:"right" }}>
+                              <div style={{ fontSize:20, fontWeight:800, color:"#10b981" }}>{fmt(total)}</div>
+                              <div style={{ fontSize:11, color:"#64748b" }}>liquidación estimada</div>
+                            </div>
+                          </div>
+                          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+                            {[
+                              { label:"Sueldo base", v:fmt(sueldo), c:"#a78bfa" },
+                              { label:"Bonus turnos", v:fmt(porTurno*data.turnos), c:"#10b981" },
+                              { label:"Diferencias", v:fmt(data.diferencias), c:data.diferencias>0?"#f43f5e":"#10b981" },
+                            ].map(x => (
+                              <div key={x.label} style={{ background:"rgba(0,0,0,0.2)", borderRadius:10, padding:"8px 10px" }}>
+                                <div style={{ fontSize:10, color:"#64748b", marginBottom:4 }}>{x.label}</div>
+                                <div style={{ fontSize:14, fontWeight:700, color:x.c }}>{x.v}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {activeTab === "rendimiento" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📊</div>
+              <div>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#a78bfa" }}>Rendimiento de Empleados</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Tiempo promedio de respuesta en WhatsApp este mes</p>
+              </div>
+            </div>
+            <CommsMonitor tenantId={tid} supabase={supabase} empleados={empleados} showRendimiento={true} />
           </div>
         )}
 
