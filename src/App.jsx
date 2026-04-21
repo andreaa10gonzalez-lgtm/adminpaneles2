@@ -1397,6 +1397,151 @@ const ExtensionSettings = ({ tid }) => {
 };
 
 // ─── COMMS MENSAJES ───────────────────────────────────────────────────────────
+const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
+  const [mensajesWA, setMensajesWA] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
+  const [filtro, setFiltro] = useState("all"); // all | ok | sospechosa
+
+  const KEYWORDS_CONFIRMACION = ["cargad", "fichas ya fueron", "acredit", "cargoo", "cargadoo", "ya cargue", "ya te cargue", "listo cargado", "ya está cargado"];
+  const WINDOW_MIN = 30; // minutos de ventana para cruce
+
+  useEffect(() => {
+    supabase.from("ext_messages")
+      .select("*")
+      .eq("tenant_id", tid)
+      .eq("message_type", "outgoing")
+      .gte("timestamp", fecha + "T00:00:00")
+      .lte("timestamp", fecha + "T23:59:59")
+      .then(({ data }) => { setMensajesWA(data || []); setLoading(false); });
+  }, [fecha]);
+
+  const confirmaciones = mensajesWA.filter(m =>
+    KEYWORDS_CONFIRMACION.some(kw => m.message_text?.toLowerCase().includes(kw))
+  );
+
+  const txsDia = (allTxsByFecha[fecha] || []).filter(t => t.tipo === "carga");
+
+  const cruce = txsDia.map(tx => {
+    const txTime = new Date(fecha + "T" + (tx.hora || "00:00:00")).getTime();
+    const jugadorNorm = (tx.jugador || "").toLowerCase().trim();
+
+    // Cruce por NOMBRE + HORARIO combinados (más preciso)
+    const porNombreYHorario = jugadorNorm.length > 3 ? mensajesWA.find(m => {
+      const mTime = new Date(m.timestamp).getTime();
+      const enRango = Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
+      if (!enRango) return false;
+      const chatNorm = (m.chat_id || "").toLowerCase().trim();
+      const senderNorm = (m.sender_name || "").toLowerCase().trim();
+      return chatNorm.includes(jugadorNorm) || jugadorNorm.includes(chatNorm) ||
+             senderNorm.includes(jugadorNorm) || jugadorNorm.includes(senderNorm);
+    }) : null;
+
+    // Cruce solo por horario con mensaje de confirmación (fallback)
+    const porHorario = !porNombreYHorario ? confirmaciones.find(m => {
+      const mTime = new Date(m.timestamp).getTime();
+      return Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
+    }) : null;
+
+    const confirmacion = porNombreYHorario || porHorario || null;
+    const metodo = porNombreYHorario ? "nombre+horario" : porHorario ? "horario" : null;
+
+    return {
+      ...tx,
+      confirmacion,
+      metodo,
+      estado: confirmacion ? "ok" : "sospechosa",
+    };
+  });
+
+  const ok = cruce.filter(c => c.estado === "ok").length;
+  const sospechosas = cruce.filter(c => c.estado === "sospechosa").length;
+
+  const filtradas = filtro === "all" ? cruce : cruce.filter(c => c.estado === filtro);
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+        <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>🔍</div>
+        <div>
+          <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#f59e0b" }}>Cruce de Cargas</h2>
+          <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Verifica cargas del casino contra confirmaciones en WhatsApp (±{WINDOW_MIN} min)</p>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap", alignItems:"center" }}>
+        <input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setLoading(true); }}
+          style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"8px 12px", fontSize:13 }} />
+        <div style={{ display:"flex", gap:6 }}>
+          {[["all","Todas"],["ok","✅ Verificadas"],["sospechosa","⚠️ Sospechosas"]].map(([v,l]) => (
+            <button key={v} onClick={() => setFiltro(v)}
+              style={{ padding:"7px 14px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
+                background: filtro===v ? (v==="sospechosa"?"rgba(244,63,94,0.15)":v==="ok"?"rgba(16,185,129,0.15)":"rgba(124,58,237,0.15)") : "transparent",
+                borderColor: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="ok"?"#10b981":"#7c3aed") : "#1e1a38",
+                color: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="ok"?"#10b981":"#a78bfa") : "#64748b" }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+        {[
+          { label:"Total cargas", v:cruce.length, c:"#f59e0b" },
+          { label:"✅ Verificadas", v:ok, c:"#10b981" },
+          { label:"⚠️ Sospechosas", v:sospechosas, c:"#f43f5e" },
+        ].map(x => (
+          <div key={x.label} style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:12, padding:"14px 16px" }}>
+            <div style={{ fontSize:11,color:"#64748b",marginBottom:6 }}>{x.label}</div>
+            <div style={{ fontSize:24,fontWeight:800,color:x.c }}>{x.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {loading ? <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div> : filtradas.length === 0 ? (
+        <div style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:40,textAlign:"center",color:"#64748b" }}>
+          No hay cargas para esta fecha
+        </div>
+      ) : (
+        <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+          {filtradas.map((c,i) => (
+            <div key={i} style={{ background:"#0f0d1f", border:"1px solid", borderRadius:12, padding:"12px 16px",
+              borderColor: c.estado==="ok" ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.3)" }}>
+              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap" }}>
+                <div>
+                  <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:4 }}>
+                    {c.estado==="ok" ? "✅" : "⚠️"} {c.jugador || "Sin nombre"} — {fmt(+c.monto)}
+                  </div>
+                  <div style={{ fontSize:11,color:"#64748b" }}>
+                    Casino: {c.hora?.slice(0,5) || "??:??"}
+                    {c.confirmacion && <span style={{ color:"#10b981",marginLeft:8 }}>
+                      · WhatsApp: {new Date(c.confirmacion.timestamp).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}
+                    </span>}
+                  </div>
+                </div>
+                <div style={{ textAlign:"right",flexShrink:0 }}>
+                  {c.estado==="ok" ? (
+                    <div style={{ fontSize:11,color:"#10b981",fontWeight:600 }}>
+                      ✅ {c.metodo === "nombre+horario" ? "Verificada · nombre + hora" : "Verificada · solo horario"}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize:11,color:"#f43f5e",fontWeight:600 }}>⚠️ Sin confirmación WA</div>
+                  )}
+                </div>
+              </div>
+              {c.confirmacion && (
+                <div style={{ marginTop:8,background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#94a3b8" }}>
+                  💬 "{c.confirmacion.message_text?.slice(0,80)}"
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CommsMensajes = ({ tid, supabase, fmt }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1977,6 +2122,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
     ]},
     { id: "operaciones", label: "Operaciones", icon: "◆", items: [
       { id: "caja",    label: "Caja",    desc: "Control de cajas y turnos" },
+      { id: "cruce",   label: "Cruce de Cargas", desc: "Verificación de cargas vs WhatsApp" },
       { id: "bonos",   label: "Bonos",   desc: "Bonos entregados" },
       { id: "bajas",   label: "Bajas",   desc: "Retiros de caja" },
       { id: "cargar",  label: editId ? "Editar entrada" : "Cargar panel", desc: "Ingresar datos diarios" },
@@ -2395,6 +2541,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "cruce" && (
+          <CruceCargas tid={tid} supabase={supabase} fmt={fmt} allTxsByFecha={allTxsByFecha} />
         )}
 
         {activeTab === "bonos" && (
