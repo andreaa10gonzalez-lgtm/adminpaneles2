@@ -1396,13 +1396,20 @@ const CommsMensajes = ({ tid, supabase, fmt }) => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
 
-  useEffect(() => {
+  const loadMessages = () => {
     supabase.from("ext_messages")
       .select("*")
       .eq("tenant_id", tid)
+      .gte("timestamp", new Date(Date.now() - 24*60*60*1000).toISOString())
       .order("timestamp", { ascending: false })
-      .limit(100)
+      .limit(200)
       .then(({ data }) => { setMessages(data || []); setLoading(false); });
+  };
+
+  useEffect(() => {
+    loadMessages();
+    const interval = setInterval(loadMessages, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const filtered = filter === "all" ? messages : messages.filter(m => m.detected_action === filter);
