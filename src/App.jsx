@@ -1397,12 +1397,19 @@ const CommsMensajes = ({ tid, supabase, fmt }) => {
   const [filter, setFilter] = useState("all");
 
   const loadMessages = () => {
+    // Load last 24h, exclude junk chatIds
     supabase.from("ext_messages")
       .select("*")
       .eq("tenant_id", tid)
       .gte("timestamp", new Date(Date.now() - 24*60*60*1000).toISOString())
+      .not("chat_id", "ilike", "%últ.%")
+      .not("chat_id", "ilike", "%haz clic%")
+      .not("chat_id", "ilike", "%línea%")
+      .not("chat_id", "ilike", "%Nuevo chat%")
+      .not("chat_id", "ilike", "%Detalles%")
+      .not("chat_id", "ilike", "%Cuenta de empresa%")
       .order("timestamp", { ascending: false })
-      .limit(200)
+      .limit(500)
       .then(({ data }) => { setMessages(data || []); setLoading(false); });
   };
 
