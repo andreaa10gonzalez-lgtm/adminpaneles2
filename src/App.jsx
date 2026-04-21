@@ -1512,11 +1512,15 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
                   <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:4 }}>
                     {c.estado==="ok" ? "✅" : "⚠️"} {c.jugador || "Sin nombre"} — {fmt(+c.monto)}
                   </div>
-                  <div style={{ fontSize:11,color:"#64748b" }}>
-                    Casino: {c.hora?.slice(0,5) || "??:??"}
-                    {c.confirmacion && <span style={{ color:"#10b981",marginLeft:8 }}>
-                      · WhatsApp: {new Date(c.confirmacion.timestamp).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}
-                    </span>}
+                  <div style={{ fontSize:11,color:"#64748b",marginTop:2 }}>
+                    🎰 Casino: {c.hora?.slice(0,5) || "??:??"}
+                    {c.confirmacion
+                      ? <span style={{ color:"#10b981",marginLeft:8 }}>
+                          · 📱 WA: {new Date(c.confirmacion.timestamp).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}
+                          {c.confirmacion.chat_id && <span style={{ color:"#a78bfa",marginLeft:6 }}>· {c.confirmacion.chat_id}</span>}
+                        </span>
+                      : <span style={{ color:"#f43f5e",marginLeft:8 }}>· Sin mensaje en WhatsApp</span>
+                    }
                   </div>
                 </div>
                 <div style={{ textAlign:"right",flexShrink:0 }}>
