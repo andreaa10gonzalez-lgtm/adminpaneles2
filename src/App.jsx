@@ -1517,7 +1517,13 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
                     {c.confirmacion
                       ? <span style={{ color:"#10b981",marginLeft:8 }}>
                           · 📱 WA: {new Date(c.confirmacion.timestamp).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}
-                          {c.confirmacion.chat_id && <span style={{ color:"#a78bfa",marginLeft:6 }}>· {c.confirmacion.chat_id}</span>}
+                          {c.confirmacion.chat_id && 
+                            !["Detalles del perfil","Nuevo chat","Cuenta de empresa"].includes(c.confirmacion.chat_id) &&
+                            !c.confirmacion.chat_id.includes("últ.") &&
+                            !c.confirmacion.chat_id.includes("línea") &&
+                            !c.confirmacion.chat_id.includes("haz clic") &&
+                            <span style={{ color:"#a78bfa",marginLeft:6 }}>· {c.confirmacion.chat_id}</span>
+                          }
                         </span>
                       : <span style={{ color:"#f43f5e",marginLeft:8 }}>· Sin mensaje en WhatsApp</span>
                     }
