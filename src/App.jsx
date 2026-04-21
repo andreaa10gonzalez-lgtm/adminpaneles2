@@ -1657,6 +1657,13 @@ const OwnerDashboard = ({ session, onLogout }) => {
     setNotificaciones(notifs || []);
     setJugadorStats(stats || []);
 
+    // Refresh jugador_stats in background from panel_transactions
+    supabase.rpc('refresh_jugador_stats').then(() => {
+      db.getJugadorStats(tid, cmk()).then(fresh => {
+        if (fresh?.length) setJugadorStats(fresh);
+      });
+    }).catch(() => {}); // silently fail if function doesn't exist
+
     // Group transactions by fecha for fast lookup
     const byFecha = {};
     (allTxs || []).forEach(t => {
