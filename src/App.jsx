@@ -9,6 +9,12 @@ if (typeof document !== "undefined" && !document.getElementById("sg-font")) {
   l.rel = "stylesheet";
   l.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap";
   document.head.appendChild(l);
+  // Fix mobile body background
+  document.documentElement.style.background = "#080612";
+  document.body.style.background = "#080612";
+  document.body.style.margin = "0";
+  document.body.style.padding = "0";
+  document.body.style.overflowX = "hidden";
 }
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
