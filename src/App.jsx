@@ -217,6 +217,8 @@ const db = {
   getAllTransactions: async (tid) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).order("hora"); return data || []; },
   upsertTransactions: async (txs) => supabase.from("panel_transactions").upsert(txs, { onConflict: "tenant_id,fecha,hora,jugador,tipo" }),
   getJugadorStats: async (tid, mes) => { const { data } = await supabase.from("jugador_stats").select("*").eq("tenant_id", tid).eq("mes", mes); return data || []; },
+  getContactos: async (tid) => { const { data } = await supabase.from("jugadores_contactos").select("*").eq("tenant_id", tid).order("total_cargas", {ascending:false}); return data || []; },
+  upsertContacto: async (c) => supabase.from("jugadores_contactos").upsert(c, {onConflict:"tenant_id,username"}),
   upsertJugadorStats: async (stats) => supabase.from("jugador_stats").upsert(stats, { onConflict: "tenant_id,nombre,mes" }),
 
   // Campaña
@@ -1810,6 +1812,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [jugSeg, setJugSeg] = useState(null);
   const [jugFiltro, setJugFiltro] = useState("");
   const [jugadorStats, setJugadorStats] = useState([]);
+  const [contactos, setContactos] = useState([]);
   const [iaLoading, setIaLoading] = useState(false);
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaPregunta, setIaPregunta] = useState("");
@@ -1831,6 +1834,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
     setJugadores(jugs); setCampaign(camp); setEmpleados(emps); setCajas(cajs);
     setNotificaciones(notifs || []);
     setJugadorStats(stats || []);
+
+    // Load contactos (username + phone database)
+    const contactosData = await db.getContactos(tid);
+    setContactos(contactosData || []);
 
     // Refresh jugador_stats in background from panel_transactions
     supabase.rpc('refresh_jugador_stats').then(() => {
@@ -2148,6 +2155,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
       { id: "ranking",     label: "Ranking",     desc: "Jugadores más activos del mes" },
       { id: "inactivos",   label: "Inactivos",   desc: "Jugadores sin actividad reciente" },
       { id: "horarios",    label: "Horarios",    desc: "Pico de cargas por hora" },
+      { id: "contactos",   label: "Contactos",   desc: "Base de datos usuarios + teléfonos" },
+      { id: "recuperacion", label: "Recuperación",  desc: "Inactivos por prioridad con exportación CSV" },
       { id: "campana",     label: "Campaña",     desc: "Recuperación de jugadores" },
       { id: "ia",          label: "IA Analista", desc: "Análisis inteligente" },
     ]},
@@ -2495,23 +2504,39 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {filtrados.map(j => {
                         const stats = getJugStats(j.nombre);
+                        // Look up phone from contactos table
+                        const contacto = contactos.find(c => c.username?.toLowerCase() === j.nombre?.toLowerCase());
+                        const telefono = j.telefono || contacto?.telefono || null;
                         return (
                           <div key={j.nombre} style={{ background: "rgba(8,6,18,0.7)", border: "1px solid #1e1e38", borderRadius: 12, padding: "13px 16px" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                              <div>
+                              <div style={{ flex:1 }}>
                                 <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {j.nombre}</div>
                                 <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
                                   Primera vez: {j.primera_vez || "—"} · {stats.cant_cargas || 0} carga{(stats.cant_cargas || 0) !== 1 ? "s" : ""} este mes · máx: {fmt(stats.max_carga || 0)}
-                                  {j.telefono ? ` · 📱 ${j.telefono}` : ""}
                                 </div>
-                              </div>
-                              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                                {j.telefono ? (
-                                  <span style={{ fontSize: 12, color: "#10b981" }}>📱 {j.telefono}</span>
-                                ) : (
-                                  <input type="text" placeholder="+ teléfono" style={{ ...S.input, width: 130, fontSize: 12, padding: "6px 10px" }}
-                                    onBlur={async e => { if (e.target.value) { await supabase.from("jugadores").update({ telefono: e.target.value }).eq("tenant_id", tid).eq("nombre", j.nombre); loadAll(); } }} />
+                                {telefono && (
+                                  <div style={{ fontSize:12, color:"#10b981", marginTop:4 }}>📱 {telefono}</div>
                                 )}
+                              </div>
+                              <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink:0 }}>
+                                {!telefono && (
+                                  <input type="text" placeholder="+ teléfono" style={{ ...S.input, width: 130, fontSize: 12, padding: "6px 10px" }}
+                                    onBlur={async e => {
+                                      if (e.target.value) {
+                                        await db.upsertContacto({tenant_id:tid, username:j.nombre, telefono:e.target.value, total_cargas:stats.total_cargas||0});
+                                        setContactos(prev => {
+                                          const exists = prev.find(c => c.username === j.nombre);
+                                          if (exists) return prev.map(c => c.username===j.nombre ? {...c,telefono:e.target.value} : c);
+                                          return [...prev, {username:j.nombre, telefono:e.target.value, tenant_id:tid}];
+                                        });
+                                      }
+                                    }} />
+                                )}
+                                <div style={{ textAlign:"right" }}>
+                                  <div style={{ fontWeight:700, color:"#f59e0b", fontSize:14 }}>{fmt(stats.total_cargas||0)}</div>
+                                  <div style={{ fontSize:10, color:"#64748b" }}>total mes</div>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2728,6 +2753,257 @@ const OwnerDashboard = ({ session, onLogout }) => {
           </div>
         )}
 
+        {activeTab === "contactos" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#06b6d4,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📋</div>
+              <div style={{ flex:1 }}>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#06b6d4" }}>Contactos de Jugadores</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Base de datos: usuario del casino + número de WhatsApp</p>
+              </div>
+              <div style={{ ...S.badge, background:"rgba(6,182,212,0.15)", color:"#06b6d4" }}>{contactos.length} jugadores</div>
+            </div>
+
+            {(() => {
+              const [busq, setBusq] = React.useState("");
+              const [editando, setEditando] = React.useState(null);
+              const [telefEdit, setTelefEdit] = React.useState("");
+
+              const filtrados = contactos.filter(c =>
+                !busq || c.username?.toLowerCase().includes(busq.toLowerCase()) ||
+                c.telefono?.includes(busq) || c.nombre_real?.toLowerCase().includes(busq.toLowerCase())
+              );
+
+              const guardarTelefono = async (c) => {
+                await db.upsertContacto({ ...c, telefono: telefEdit, updated_at: new Date().toISOString() });
+                setContactos(prev => prev.map(x => x.username === c.username ? {...x, telefono: telefEdit} : x));
+                setEditando(null);
+              };
+
+              return (
+                <div>
+                  <div style={{ marginBottom:16 }}>
+                    <input
+                      placeholder="🔍 Buscar por usuario, teléfono o nombre..."
+                      value={busq} onChange={e => setBusq(e.target.value)}
+                      style={{ width:"100%", background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9",
+                        borderRadius:10, padding:"10px 16px", fontSize:13, outline:"none" }}
+                    />
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                    {filtrados.slice(0,100).map(c => (
+                      <div key={c.username} style={{ ...S.card, display:"flex", alignItems:"center", gap:12, padding:"10px 14px" }}>
+                        <div style={{ width:36,height:36,borderRadius:10,background:"rgba(124,58,237,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0 }}>
+                          👤
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontWeight:700,fontSize:13,color:"#f1f5f9" }}>{c.username}</div>
+                          {c.nombre_real && <div style={{ fontSize:11,color:"#64748b" }}>{c.nombre_real}</div>}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          {editando === c.username ? (
+                            <div style={{ display:"flex", gap:6 }}>
+                              <input value={telefEdit} onChange={e => setTelefEdit(e.target.value)}
+                                placeholder="+54911..." style={{ flex:1, background:"#0f0d1f", border:"1px solid #7c3aed",
+                                color:"#f1f5f9", borderRadius:6, padding:"4px 8px", fontSize:12 }} />
+                              <button onClick={() => guardarTelefono(c)}
+                                style={{ background:"#10b981", border:"none", color:"white", borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer" }}>✓</button>
+                              <button onClick={() => setEditando(null)}
+                                style={{ background:"#1e1a38", border:"none", color:"#64748b", borderRadius:6, padding:"4px 8px", fontSize:11, cursor:"pointer" }}>✕</button>
+                            </div>
+                          ) : (
+                            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                              {c.telefono
+                                ? <span style={{ fontSize:12,color:"#10b981",fontFamily:"monospace" }}>📱 {c.telefono}</span>
+                                : <span style={{ fontSize:11,color:"#f43f5e" }}>Sin teléfono</span>
+                              }
+                              <button onClick={() => { setEditando(c.username); setTelefEdit(c.telefono||""); }}
+                                style={{ background:"transparent", border:"1px solid #1e1a38", color:"#64748b", borderRadius:6,
+                                  padding:"2px 8px", fontSize:10, cursor:"pointer" }}>✏️</button>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign:"right", flexShrink:0 }}>
+                          <div style={{ fontSize:12,fontWeight:700,color:"#f59e0b" }}>{fmt(c.total_cargas||0)}</div>
+                          <div style={{ fontSize:10,color:"#64748b" }}>total cargas</div>
+                        </div>
+                      </div>
+                    ))}
+                    {filtrados.length > 100 && (
+                      <div style={{ textAlign:"center", color:"#64748b", fontSize:12, padding:10 }}>
+                        Mostrando 100 de {filtrados.length} — usá el buscador para filtrar
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {activeTab === "recuperacion" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#f43f5e,#be123c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📣</div>
+              <div style={{ flex:1 }}>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#f43f5e" }}>Recuperación de Jugadores</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Inactivos ordenados por prioridad — exportá a CSV para campañas</p>
+              </div>
+            </div>
+            {(() => {
+              const [diasInactivo, setDiasInactivo] = React.useState(15);
+              const [soloConTel, setSoloConTel] = React.useState(false);
+
+              // Get last activity per player from transactions
+              const ultimaActividad = {};
+              Object.entries(allTxsByFecha).forEach(([fecha, txs]) => {
+                txs.forEach(tx => {
+                  if (!tx.jugador) return;
+                  if (!ultimaActividad[tx.jugador] || fecha > ultimaActividad[tx.jugador].fecha) {
+                    ultimaActividad[tx.jugador] = { fecha, monto: +tx.monto || 0 };
+                  }
+                });
+              });
+
+              const cutoff = new Date();
+              cutoff.setDate(cutoff.getDate() - diasInactivo);
+              const cutoffStr = cutoff.toISOString().slice(0,10);
+
+              // Build inactivos list with priority score
+              const inactivos = Object.entries(ultimaActividad)
+                .filter(([j, d]) => d.fecha < cutoffStr)
+                .map(([jugador, d]) => {
+                  const stats = getJugStats(jugador);
+                  const contacto = contactos.find(c => c.username?.toLowerCase() === jugador?.toLowerCase());
+                  const telefono = contacto?.telefono || null;
+                  const diasSinJugar = Math.floor((new Date() - new Date(d.fecha)) / 86400000);
+                  // Priority: higher total cargas = higher priority
+                  const prioridad = stats.total_cargas || 0;
+                  return { jugador, ultimaFecha: d.fecha, diasSinJugar, telefono, prioridad, stats, contacto };
+                })
+                .filter(j => !soloConTel || j.telefono)
+                .sort((a,b) => b.prioridad - a.prioridad);
+
+              const exportCSV = () => {
+                const rows = [
+                  ["Usuario", "Teléfono", "Días sin jugar", "Última actividad", "Total cargas histórico", "Cargas este mes", "Prioridad"],
+                  ...inactivos.map(j => [
+                    j.jugador,
+                    j.telefono || "",
+                    j.diasSinJugar,
+                    j.ultimaFecha,
+                    j.stats?.total_cargas || 0,
+                    j.stats?.cant_cargas || 0,
+                    j.prioridad > 50000 ? "ALTA" : j.prioridad > 10000 ? "MEDIA" : "BAJA"
+                  ])
+                ];
+                const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("
+");
+                const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = `recuperacion_${new Date().toISOString().slice(0,10)}.csv`;
+                a.click(); URL.revokeObjectURL(url);
+              };
+
+              const alta = inactivos.filter(j => j.prioridad > 50000).length;
+              const media = inactivos.filter(j => j.prioridad > 10000 && j.prioridad <= 50000).length;
+              const baja = inactivos.filter(j => j.prioridad <= 10000).length;
+              const conTel = inactivos.filter(j => j.telefono).length;
+
+              return (
+                <div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:10, marginBottom:16 }}>
+                    <div style={{ ...S.card }}>
+                      <div style={{ fontSize:12,color:"#64748b",marginBottom:8 }}>⚙️ Configuración</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                        <span style={{ fontSize:12,color:"#94a3b8" }}>Inactivos hace más de</span>
+                        <input type="number" value={diasInactivo} onChange={e=>setDiasInactivo(+e.target.value)}
+                          style={{ width:60,background:"#0f0d1f",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:6,padding:"4px 8px",fontSize:13,textAlign:"center" }} />
+                        <span style={{ fontSize:12,color:"#94a3b8" }}>días</span>
+                      </div>
+                      <label style={{ display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#94a3b8",cursor:"pointer" }}>
+                        <input type="checkbox" checked={soloConTel} onChange={e=>setSoloConTel(e.target.checked)} />
+                        Solo con teléfono cargado
+                      </label>
+                    </div>
+                    <div style={{ ...S.card }}>
+                      <div style={{ fontSize:12,color:"#64748b",marginBottom:8 }}>📊 Resumen</div>
+                      <div style={{ display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6 }}>
+                        {[
+                          {l:"Total inactivos",v:inactivos.length,c:"#f43f5e"},
+                          {l:"Con teléfono",v:conTel,c:"#10b981"},
+                          {l:"Prioridad alta",v:alta,c:"#f43f5e"},
+                          {l:"Prioridad media",v:media,c:"#f59e0b"},
+                        ].map(x=>(
+                          <div key={x.l} style={{ background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 10px" }}>
+                            <div style={{ fontSize:9,color:"#64748b" }}>{x.l}</div>
+                            <div style={{ fontSize:18,fontWeight:800,color:x.c }}>{x.v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display:"flex",gap:10,marginBottom:16 }}>
+                    <button onClick={exportCSV}
+                      style={{ background:"linear-gradient(135deg,#10b981,#059669)",border:"none",color:"white",
+                        padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8 }}>
+                      📥 Exportar CSV ({inactivos.length} jugadores)
+                    </button>
+                    {conTel < inactivos.length && (
+                      <button onClick={exportCSV}
+                        style={{ background:"rgba(6,182,212,0.15)",border:"1px solid rgba(6,182,212,0.3)",color:"#06b6d4",
+                          padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer" }}
+                        onClick={() => { setSoloConTel(true); setTimeout(exportCSV, 100); }}>
+                        📱 Solo con teléfono ({conTel})
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                    {inactivos.slice(0,50).map(j => {
+                      const prioLabel = j.prioridad > 50000 ? {l:"ALTA",c:"#f43f5e",bg:"rgba(244,63,94,0.1)"} :
+                                        j.prioridad > 10000 ? {l:"MEDIA",c:"#f59e0b",bg:"rgba(245,158,11,0.1)"} :
+                                        {l:"BAJA",c:"#64748b",bg:"rgba(100,116,139,0.1)"};
+                      return (
+                        <div key={j.jugador} style={{ ...S.card, display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
+                          borderColor: j.prioridad>50000?"rgba(244,63,94,0.25)":"#1e1a38" }}>
+                          <div style={{ padding:"3px 10px",borderRadius:20,background:prioLabel.bg,
+                            color:prioLabel.c,fontSize:10,fontWeight:700,flexShrink:0 }}>
+                            {prioLabel.l}
+                          </div>
+                          <div style={{ flex:1,minWidth:0 }}>
+                            <div style={{ fontWeight:700,fontSize:13,color:"#f1f5f9" }}>{j.jugador}</div>
+                            <div style={{ fontSize:11,color:"#64748b" }}>
+                              Sin jugar hace {j.diasSinJugar} días · última vez {j.ultimaFecha}
+                            </div>
+                          </div>
+                          <div style={{ flexShrink:0,textAlign:"center" }}>
+                            {j.telefono
+                              ? <div style={{ fontSize:12,color:"#10b981",fontFamily:"monospace" }}>📱 {j.telefono}</div>
+                              : <div style={{ fontSize:11,color:"#f43f5e" }}>Sin teléfono</div>
+                            }
+                          </div>
+                          <div style={{ textAlign:"right",flexShrink:0 }}>
+                            <div style={{ fontSize:13,fontWeight:700,color:"#f59e0b" }}>{fmt(j.prioridad)}</div>
+                            <div style={{ fontSize:10,color:"#64748b" }}>total histórico</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {inactivos.length > 50 && (
+                      <div style={{ textAlign:"center",color:"#64748b",fontSize:12,padding:10 }}>
+                        Mostrando top 50 — exportá el CSV para ver todos los {inactivos.length}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {activeTab === "campana" && (
           <div>
             <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c4b5fd" }}>📣 Campaña de Recuperación</h2>
@@ -2835,6 +3111,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   { label: "Neto del mes", v: fmt(cmN) },
                   { label: "Jugadores activos", v: cmUnicos },
                   { label: "Alertas de caja", v: alertas.length },
+                  { label: "Msgs WA hoy", v: commsData?.totalHoy || "—" },
+                  { label: "Alertas WA", v: commsData?.alertasActivas || "—" },
+                  { label: "Resp. promedio", v: commsData?.avgResp ? Math.floor(commsData.avgResp/60)+"m" : "—" },
+                  { label: "Sospechosas", v: "ver cruce" },
                 ].map(x => (
                   <div key={x.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
                     <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>{x.label}</div>
@@ -2865,7 +3145,32 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       mesesData[mes].dias++;
                     });
                     const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
-                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDATOS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
+                    // Get WhatsApp data for IA
+                    const today = new Date().toISOString().slice(0,10);
+                    const txsHoy = Object.values(allTxsByFecha[today] || []);
+                    const msgHoy = await supabase.from("ext_messages").select("message_type,sender_name,detected_action,response_time_seconds,timestamp").eq("tenant_id", tid).gte("timestamp", today + "T00:00:00").order("timestamp", {ascending:false}).limit(200).then(r => r.data || []);
+                    const alertasWA = await supabase.from("ext_alerts").select("*").eq("tenant_id", tid).eq("leida", false).then(r => r.data || []);
+                    
+                    const waIncoming = msgHoy.filter(m => m.message_type === "incoming").length;
+                    const waOutgoing = msgHoy.filter(m => m.message_type === "outgoing").length;
+                    const waCargas = msgHoy.filter(m => m.detected_action === "carga").length;
+                    const waRetiros = msgHoy.filter(m => m.detected_action === "retiro").length;
+                    const avgResp = msgHoy.filter(m => m.response_time_seconds > 0).length > 0
+                      ? Math.round(msgHoy.filter(m => m.response_time_seconds > 0).reduce((s,m) => s + m.response_time_seconds, 0) / msgHoy.filter(m => m.response_time_seconds > 0).length)
+                      : null;
+
+                    // Cruce sospechosas hoy
+                    const KEYWORDS = ["cargad","fichas ya fueron","cargoo","cargadoo"];
+                    const confirmaciones = msgHoy.filter(m => KEYWORDS.some(k => m.message_text?.toLowerCase().includes(k)));
+                    const txsHoyCarga = txsHoy.filter(t => t.tipo === "carga");
+                    const sospechosas = txsHoyCarga.filter(tx => {
+                      const txTime = new Date(today + "T" + (tx.hora || "00:00:00")).getTime();
+                      return !confirmaciones.find(m => Math.abs(new Date(m.timestamp).getTime() - txTime) <= 30*60*1000);
+                    }).length;
+
+                    const waResumen = `\n\nDATOS DE WHATSAPP (hoy):\n- Mensajes recibidos de clientes: ${waIncoming}\n- Mensajes enviados por empleados: ${waOutgoing}\n- Pedidos de carga detectados: ${waCargas}\n- Pedidos de retiro detectados: ${waRetiros}\n- Tiempo promedio de respuesta: ${avgResp ? Math.floor(avgResp/60)+"m "+avgResp%60+"s" : "sin datos"}\n- Alertas activas (clientes sin respuesta): ${alertasWA.length}\n- Cargas sospechosas (sin confirmacion WA hoy): ${sospechosas}`;
+
+                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDATOS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}${waResumen}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo incluyendo: rendimiento del negocio, comunicaciones con clientes (WhatsApp), posibles irregularidades, y 3 recomendaciones concretas para esta semana."}`;
                     fetch("https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/ia-analista", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
@@ -2890,15 +3195,36 @@ const OwnerDashboard = ({ session, onLogout }) => {
                       mesesData[mes].dias++;
                     });
                     const resumenMeses = Object.entries(mesesData).slice(-3).map(([mes,d]) => `${mes}: cargas $${Math.round(d.cargas/1000)}k, retiros $${Math.round(d.retiros/1000)}k, neto $${Math.round((d.cargas-d.retiros)/1000)}k (${d.dias} días)`).join('\n');
-                    const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDATOS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo identificando: tendencias, oportunidades de mejora, alertas o riesgos, y 3 recomendaciones concretas para esta semana."}`;
-                    fetch("https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/ia-analista", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ prompt })
-                    }).then(r => r.json()).then(data => {
-                      setIaAnalisis(data.result || ("Error: " + (data.error || "No se pudo obtener análisis.")));
-                      setIaLoading(false);
-                    }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
+                    // Get WhatsApp data for IA
+                    const today = new Date().toISOString().slice(0,10);
+                    const txsHoy = Object.values(allTxsByFecha[today] || []);
+                    supabase.from("ext_messages").select("message_type,sender_name,detected_action,response_time_seconds,timestamp").eq("tenant_id", tid).gte("timestamp", today + "T00:00:00").limit(200).then(async r => {
+                      const msgHoy = r.data || [];
+                      const alertasWA = (await supabase.from("ext_alerts").select("*").eq("tenant_id", tid).eq("leida", false)).data || [];
+                      const waIncoming = msgHoy.filter(m => m.message_type === "incoming").length;
+                      const waOutgoing = msgHoy.filter(m => m.message_type === "outgoing").length;
+                      const waCargas = msgHoy.filter(m => m.detected_action === "carga").length;
+                      const waRetiros = msgHoy.filter(m => m.detected_action === "retiro").length;
+                      const avgResp = msgHoy.filter(m => m.response_time_seconds > 0).length > 0
+                        ? Math.round(msgHoy.filter(m => m.response_time_seconds > 0).reduce((s,m) => s + m.response_time_seconds, 0) / msgHoy.filter(m => m.response_time_seconds > 0).length)
+                        : null;
+                      const KEYWORDS = ["cargad","fichas ya fueron","cargoo","cargadoo"];
+                      const confirmaciones = msgHoy.filter(m => KEYWORDS.some(k => m.message_text?.toLowerCase().includes(k)));
+                      const sospechosas = (txsHoy||[]).filter(tx => tx.tipo==="carga").filter(tx => {
+                        const txTime = new Date(today + "T" + (tx.hora || "00:00:00")).getTime();
+                        return !confirmaciones.find(m => Math.abs(new Date(m.timestamp).getTime() - txTime) <= 30*60*1000);
+                      }).length;
+                      const waResumen = `\n\nDATOS DE WHATSAPP (hoy):\n- Mensajes recibidos de clientes: ${waIncoming}\n- Mensajes enviados por empleados: ${waOutgoing}\n- Pedidos de carga detectados: ${waCargas}\n- Pedidos de retiro detectados: ${waRetiros}\n- Tiempo promedio de respuesta: ${avgResp ? Math.floor(avgResp/60)+"m "+avgResp%60+"s" : "sin datos"}\n- Alertas activas (clientes sin respuesta): ${alertasWA.length}\n- Cargas sospechosas (sin confirmacion WA hoy): ${sospechosas}`;
+                      const prompt = `Sos un analista experto en operaciones de casinos online en Argentina. Analizá estos datos reales y respondé de forma clara, directa y útil para el dueño del negocio. Usá pesos argentinos y sé específico.\n\nDATOS DEL NEGOCIO:\n- Nombre: ${config.nombre || "Casino"}\n- Mes actual: cargas $${Math.round((cmN+cmR > 0 ? cmN+cmR : 0)/1000)}k, retiros $${Math.round((cmR||0)/1000)}k, neto $${Math.round((cmN||0)/1000)}k\n- Jugadores activos este mes: ${cmUnicos}\n- Jugadores nuevos este mes: ${cmNuevos}\n- Alertas de caja (diferencias detectadas): ${alertas.length}\n- Empleados activos: ${empleados.filter(e=>e.activo).length}\n- Historial últimos meses:\n${resumenMeses}\n- Total jugadores en historial: ${totalPlayers}${waResumen}\n${iaPregunta ? `\nPREGUNTA ESPECÍFICA DEL DUEÑO: ${iaPregunta}` : "\nHacé un análisis completo incluyendo: rendimiento del negocio, comunicaciones con clientes (WhatsApp), posibles irregularidades, y 3 recomendaciones concretas para esta semana."}`;
+                      fetch("https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/ia-analista", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt })
+                      }).then(r => r.json()).then(data => {
+                        setIaAnalisis(data.result || ("Error: " + (data.error || "No se pudo obtener análisis.")));
+                        setIaLoading(false);
+                      }).catch(() => { setIaAnalisis("Error al conectar con la IA. Intentá de nuevo."); setIaLoading(false); });
+                    });
                   }}
                   disabled={iaLoading}
                   style={{ ...S.btn, padding: "11px 22px", opacity: iaLoading ? 0.7 : 1, whiteSpace: "nowrap" }}
