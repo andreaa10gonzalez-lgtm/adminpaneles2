@@ -3143,7 +3143,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   onChange={e => setIaPregunta(e.target.value)}
                   placeholder='Ej: "¿Qué días rinden más?" o "¿Hay algo raro en caja?"'
                   style={{ ...S.input, flex: 1, fontSize: 13 }}
-                  onKeyDown={e => e.key === "Enter" && !iaLoading && (() => {
+                  onKeyDown={e => e.key === "Enter" && !iaLoading && (async () => {
                     setIaLoading(true);
                     setIaAnalisis(null);
                     const mesesData = {};
