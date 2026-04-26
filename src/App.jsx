@@ -218,6 +218,8 @@ const db = {
   upsertTransactions: async (txs) => supabase.from("panel_transactions").upsert(txs, { onConflict: "tenant_id,fecha,hora,jugador,tipo" }),
   getJugadorStats: async (tid, mes) => { const { data } = await supabase.from("jugador_stats").select("*").eq("tenant_id", tid).eq("mes", mes); return data || []; },
   getContactos: async (tid) => { const { data } = await supabase.from("jugadores_contactos").select("*").eq("tenant_id", tid).order("total_cargas", {ascending:false}); return data || []; },
+  getCreditos: async (tid) => { const { data } = await supabase.from("ocr_creditos").select("*").eq("tenant_id", tid).single(); return data || null; },
+  getOcrUso: async (tid) => { const { data } = await supabase.from("ocr_uso").select("*").eq("tenant_id", tid).gte("created_at", new Date(Date.now()-7*86400000).toISOString()).order("created_at",{ascending:false}); return data || []; },
   upsertContacto: async (c) => supabase.from("jugadores_contactos").upsert(c, {onConflict:"tenant_id,username"}),
   upsertJugadorStats: async (stats) => supabase.from("jugador_stats").upsert(stats, { onConflict: "tenant_id,nombre,mes" }),
 
@@ -1813,6 +1815,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [jugFiltro, setJugFiltro] = useState("");
   const [jugadorStats, setJugadorStats] = useState([]);
   const [contactos, setContactos] = useState([]);
+  const [creditos, setCreditos] = useState(null);
+  const [ocrUso, setOcrUso] = useState([]);
   const [iaLoading, setIaLoading] = useState(false);
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaPregunta, setIaPregunta] = useState("");
@@ -1838,6 +1842,12 @@ const OwnerDashboard = ({ session, onLogout }) => {
     // Load contactos (username + phone database)
     const contactosData = await db.getContactos(tid);
     setContactos(contactosData || []);
+
+    // Load OCR credits
+    const creditosData = await db.getCreditos(tid);
+    setCreditos(creditosData);
+    const ocrUsoData = await db.getOcrUso(tid);
+    setOcrUso(ocrUsoData || []);
 
     // Refresh jugador_stats in background from panel_transactions
     supabase.rpc('refresh_jugador_stats').then(() => {
@@ -2163,6 +2173,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
     { id: "gestion",     label: "Gestión",     icon: "◇", items: [
       { id: "empleados_hist", label: "Empleados",   desc: "Historial por empleado" },
       { id: "liquidacion",    label: "Liquidación", desc: "Calculadora de sueldos" },
+      { id: "creditos",       label: "Créditos OCR", desc: "Saldo y recargas de créditos" },
       { id: "ajustes",        label: "Ajustes",     desc: "Configuración del panel" },
     ]},
     { id: "comms",        label: "Comunicaciones", icon: "◐", items: [
@@ -3566,6 +3577,133 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     </div>)}
                   </div>);
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "creditos" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>⚡</div>
+              <div style={{ flex:1 }}>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#f59e0b" }}>Créditos OCR</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Análisis automático de comprobantes con inteligencia artificial</p>
+              </div>
+            </div>
+
+            {creditos ? (
+              <div>
+                {/* Saldo actual */}
+                <div style={{ ...S.card, background:"linear-gradient(135deg,rgba(245,158,11,0.1),rgba(217,119,6,0.05))", borderColor:"rgba(245,158,11,0.3)", marginBottom:16 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:16 }}>
+                    <div>
+                      <div style={{ fontSize:12,color:"#64748b",marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em" }}>Créditos disponibles</div>
+                      <div style={{ fontSize:48,fontWeight:800,color:"#f59e0b",lineHeight:1 }}>
+                        {creditos.plan === "unlimited" ? "∞" : creditos.creditos_disponibles?.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize:12,color:"#64748b",marginTop:4 }}>
+                        {creditos.plan === "unlimited" ? "Plan ilimitado" : `Usados hoy: ${creditos.creditos_usados_hoy || 0}`}
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ display:"inline-block",background:"rgba(124,58,237,0.15)",border:"1px solid rgba(124,58,237,0.3)",color:"#a78bfa",padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,marginBottom:8 }}>
+                        Plan {creditos.plan?.toUpperCase()}
+                      </div>
+                      <div style={{ fontSize:11,color:"#64748b" }}>1 crédito = 1 imagen analizada</div>
+                    </div>
+                  </div>
+
+                  {creditos.plan !== "unlimited" && (
+                    <div style={{ marginTop:16 }}>
+                      <div style={{ background:"rgba(0,0,0,0.2)",borderRadius:100,height:8 }}>
+                        <div style={{ background:"linear-gradient(90deg,#f59e0b,#fbbf24)",borderRadius:100,height:8,
+                          width:`${Math.min(100,(creditos.creditos_disponibles||0)/1000*100)}%`,transition:"width 0.8s" }} />
+                      </div>
+                      <div style={{ display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b",marginTop:4 }}>
+                        <span>{creditos.creditos_disponibles} restantes</span>
+                        <span>1.000 créditos = $10 USD/día</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Planes de recarga */}
+                <div style={{ fontSize:14,fontWeight:700,color:"#f1f5f9",marginBottom:12 }}>💳 Recargar créditos</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:20 }}>
+                  {[
+                    { nombre:"Básico", creditos:500, precio_usd:5, precio_ars:"$5.000", desc:"~500 imágenes", color:"#06b6d4" },
+                    { nombre:"Estándar", creditos:1500, precio_usd:13, precio_ars:"$13.000", desc:"~1.500 imágenes", color:"#7c3aed", popular:true },
+                    { nombre:"Pro", creditos:3500, precio_usd:28, precio_ars:"$28.000", desc:"~3.500 imágenes", color:"#f59e0b" },
+                    { nombre:"Ilimitado/día", creditos:99999, precio_usd:10, precio_ars:"$10.000/día", desc:"Sin límite diario", color:"#10b981" },
+                  ].map(plan => (
+                    <div key={plan.nombre} style={{ ...S.card, border:`1px solid ${plan.color}40`, background:`${plan.color}08`, position:"relative" }}>
+                      {plan.popular && (
+                        <div style={{ position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",
+                          background:plan.color,color:"white",fontSize:10,fontWeight:700,padding:"2px 10px",borderRadius:20 }}>
+                          MÁS ELEGIDO
+                        </div>
+                      )}
+                      <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:4 }}>{plan.nombre}</div>
+                      <div style={{ fontSize:24,fontWeight:800,color:plan.color,marginBottom:2 }}>{plan.precio_ars}</div>
+                      <div style={{ fontSize:11,color:"#64748b",marginBottom:12 }}>{plan.desc}</div>
+                      <button
+                        onClick={() => {
+                          // Generate MercadoPago payment link
+                          const msg = `Hola! Quiero recargar el plan ${plan.nombre} (${plan.creditos} créditos) para mi panel. Tenant: ${tid}`;
+                          window.open(`https://wa.me/5492236000000?text=${encodeURIComponent(msg)}`, "_blank");
+                        }}
+                        style={{ width:"100%",background:plan.color,border:"none",color:"white",padding:"10px",
+                          borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer" }}>
+                        Recargar →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Uso reciente */}
+                <div style={{ fontSize:14,fontWeight:700,color:"#f1f5f9",marginBottom:12 }}>📊 Uso últimos 7 días</div>
+                {ocrUso.length === 0 ? (
+                  <div style={{ ...S.card, textAlign:"center", color:"#64748b", padding:30 }}>
+                    No hay imágenes procesadas todavía. Instalá la extensión para empezar.
+                  </div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                    {ocrUso.slice(0,20).map((u,i) => {
+                      const r = u.imagen_resultado || {};
+                      return (
+                        <div key={i} style={{ ...S.card, display:"flex", alignItems:"center", gap:12, padding:"10px 14px" }}>
+                          <div style={{ fontSize:18 }}>
+                            {r.es_comprobante ? (r.tipo==="carga"?"💰":r.tipo==="retiro"?"💸":"📄") : "🖼️"}
+                          </div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:12,fontWeight:600,color:"#f1f5f9" }}>
+                              {r.es_comprobante ? `${r.tipo==="carga"?"Carga":"Retiro"} detectada — $${r.monto?.toLocaleString()||"?"}` : "Imagen no identificada como comprobante"}
+                            </div>
+                            <div style={{ fontSize:10,color:"#64748b" }}>
+                              {u.chat_id} · {new Date(u.created_at).toLocaleString("es-AR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}
+                              {r.confianza && ` · Confianza: ${r.confianza}`}
+                            </div>
+                          </div>
+                          <div style={{ fontSize:10,color:"#64748b",textAlign:"right" }}>
+                            {u.tokens_usados} tokens
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Info */}
+                <div style={{ ...S.card, marginTop:16, background:"rgba(6,182,212,0.05)", borderColor:"rgba(6,182,212,0.2)", fontSize:12, color:"#64748b" }}>
+                  💡 <b>¿Cómo funciona?</b> La extensión detecta automáticamente las imágenes de comprobantes que mandan los clientes por WhatsApp. Claude Haiku analiza cada imagen e identifica si es una carga o retiro, el monto y el banco. Cada imagen analizada consume 1 crédito.
+                </div>
+              </div>
+            ) : (
+              <div style={{ ...S.card, textAlign:"center", padding:40, color:"#64748b" }}>
+                <div style={{ fontSize:32,marginBottom:12 }}>⚡</div>
+                <div style={{ fontWeight:700,color:"#f1f5f9",marginBottom:8 }}>OCR no configurado</div>
+                <div>Contactá al administrador para activar el análisis de imágenes.</div>
               </div>
             )}
           </div>
