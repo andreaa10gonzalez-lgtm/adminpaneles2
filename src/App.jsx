@@ -1818,6 +1818,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [creditos, setCreditos] = useState(null);
   const [ocrUso, setOcrUso] = useState([]);
   const [iaLoading, setIaLoading] = useState(false);
+  const [vencimiento, setVencimiento] = useState(null);
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaPregunta, setIaPregunta] = useState("");
   const [notificaciones, setNotificaciones] = useState([]);
@@ -1848,6 +1849,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
     setCreditos(creditosData);
     const ocrUsoData = await db.getOcrUso(tid);
     setOcrUso(ocrUsoData || []);
+
+    // Load vencimiento
+    const { data: tenantData } = await supabase.from("tenants").select("fecha_vencimiento,plan_activo,plan_nombre").eq("id", tid).single();
+    setVencimiento(tenantData);
 
     // Refresh jugador_stats in background from panel_transactions
     supabase.rpc('refresh_jugador_stats').then(() => {
@@ -2142,6 +2147,38 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
   if (!config) return <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 36 }}>🎰</div>Cargando...</div></div>;
 
+  // Check vencimiento
+  const hoy = new Date().toISOString().slice(0,10);
+  const vencido = vencimiento && !vencimiento.plan_activo || (vencimiento?.fecha_vencimiento && vencimiento.fecha_vencimiento < hoy);
+  const diasRestantes = vencimiento?.fecha_vencimiento 
+    ? Math.ceil((new Date(vencimiento.fecha_vencimiento) - new Date()) / 86400000)
+    : null;
+  const porVencer = diasRestantes !== null && diasRestantes <= 5 && diasRestantes > 0;
+
+  // Blocked screen
+  if (vencido) return (
+    <div style={{ ...S.page, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ maxWidth:480, textAlign:"center" }}>
+        <div style={{ fontSize:64, marginBottom:16 }}>🔒</div>
+        <div style={{ fontSize:24, fontWeight:800, color:"#f43f5e", marginBottom:8 }}>Plan vencido</div>
+        <div style={{ color:"#64748b", fontSize:14, marginBottom:24, lineHeight:1.6 }}>
+          Tu plan venció el {vencimiento?.fecha_vencimiento}. Renovalo para seguir usando el panel.
+        </div>
+        <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+renovar+mi+plan+de+Gestiona+tu+Panel"
+          target="_blank" rel="noopener noreferrer"
+          style={{ display:"inline-block", background:"linear-gradient(135deg,#25D366,#128C7E)", color:"white",
+            padding:"14px 28px", borderRadius:12, fontWeight:700, fontSize:15, textDecoration:"none", marginBottom:12 }}>
+          💬 Renovar por WhatsApp
+        </a>
+        <div style={{ color:"#64748b", fontSize:12, marginTop:8 }}>+54 9 2236 33-9337</div>
+        <button onClick={onLogout} style={{ display:"block", margin:"16px auto 0", background:"transparent",
+          border:"1px solid #1e1a38", color:"#64748b", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontSize:12 }}>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+
   const NAV_GROUPS = [
     { id: "inicio",      label: "Inicio",      icon: "◈", items: [
       { id: "resumen", label: "Resumen", desc: "KPIs y gráficos del mes" },
@@ -2254,6 +2291,22 @@ const OwnerDashboard = ({ session, onLogout }) => {
       <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
       {toast && <div style={{ position: "fixed", top: 20, right: 20, background: "#1e1b3a", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 20px", fontSize: 14, zIndex: 9999, maxWidth: 320 }}>{toast}</div>}
 
+      {/* Vencimiento warning banner */}
+      {porVencer && (
+        <div style={{ background:"rgba(245,158,11,0.1)", borderBottom:"1px solid rgba(245,158,11,0.3)", padding:"10px 24px",
+          display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+          <div style={{ fontSize:13, color:"#f59e0b", fontWeight:600 }}>
+            ⚠️ Tu plan vence en <b>{diasRestantes} día{diasRestantes !== 1 ? "s" : ""}</b>. Renovalo para no perder el acceso.
+          </div>
+          <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+renovar+mi+plan+de+Gestiona+tu+Panel"
+            target="_blank" rel="noopener noreferrer"
+            style={{ background:"#f59e0b", color:"#000", padding:"6px 14px", borderRadius:8,
+              fontWeight:700, fontSize:12, textDecoration:"none", flexShrink:0 }}>
+            Renovar ahora
+          </a>
+        </div>
+      )}
+
       <div style={{ background: "rgba(8,6,18,0.95)", borderBottom: "1px solid rgba(124,58,237,0.15)", padding: "14px 24px 0", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div>
@@ -2295,8 +2348,27 @@ const OwnerDashboard = ({ session, onLogout }) => {
           {NAV_GROUPS.map(group => (
             <NavGroup key={group.id} group={group} activeTab={activeTab} setActiveTab={setActiveTab} />
           ))}
+          {/* IA y OCR destacados en la nav */}
+          <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6, paddingBottom:6, paddingTop:4 }}>
+            <button onClick={() => setActiveTab("ia")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="ia" ? "linear-gradient(135deg,#7c3aed,#4f46e5)" : "rgba(124,58,237,0.12)",
+                border:"1px solid rgba(124,58,237,0.3)", borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="ia" ? "white" : "#a78bfa",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              🤖 IA Analista
+            </button>
+            <button onClick={() => setActiveTab("creditos")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="creditos" ? "linear-gradient(135deg,#f59e0b,#d97706)" : "rgba(245,158,11,0.12)",
+                border:"1px solid rgba(245,158,11,0.3)", borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="creditos" ? "white" : "#f59e0b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              ⚡ OCR {creditos && creditos.plan !== "unlimited" ? `(${creditos.creditos_disponibles})` : ""}
+            </button>
+          </div>
           {activeGroup && (
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 2, paddingBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 2, paddingBottom: 4 }}>
               {activeGroup.items.map(item => {
                 const isActive = activeTab === item.id;
                 return (
@@ -3650,7 +3722,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                         onClick={() => {
                           // Generate MercadoPago payment link
                           const msg = `Hola! Quiero recargar el plan ${plan.nombre} (${plan.creditos} créditos) para mi panel. Tenant: ${tid}`;
-                          window.open(`https://wa.me/5492236000000?text=${encodeURIComponent(msg)}`, "_blank");
+                          window.open(`https://wa.me/5492236339337?text=${encodeURIComponent(msg)}`, "_blank");
                         }}
                         style={{ width:"100%",background:plan.color,border:"none",color:"white",padding:"10px",
                           borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer" }}>
