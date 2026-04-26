@@ -2352,19 +2352,21 @@ const OwnerDashboard = ({ session, onLogout }) => {
           <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6, paddingBottom:6, paddingTop:4 }}>
             <button onClick={() => setActiveTab("ia")}
               style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
-                background: activeTab==="ia" ? "linear-gradient(135deg,#7c3aed,#4f46e5)" : "rgba(124,58,237,0.12)",
-                border:"1px solid rgba(124,58,237,0.3)", borderRadius:20, cursor:"pointer",
-                fontSize:11, fontWeight:700, color: activeTab==="ia" ? "white" : "#a78bfa",
+                background: activeTab==="ia" ? "rgba(124,58,237,0.25)" : "transparent",
+                border: activeTab==="ia" ? "1px solid #7c3aed" : "1px solid rgba(124,58,237,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color:"#a78bfa",
                 transition:"all 150ms", whiteSpace:"nowrap" }}>
               🤖 IA Analista
             </button>
             <button onClick={() => setActiveTab("creditos")}
               style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
-                background: activeTab==="creditos" ? "linear-gradient(135deg,#f59e0b,#d97706)" : "rgba(245,158,11,0.12)",
-                border:"1px solid rgba(245,158,11,0.3)", borderRadius:20, cursor:"pointer",
-                fontSize:11, fontWeight:700, color: activeTab==="creditos" ? "white" : "#f59e0b",
+                background: activeTab==="creditos" ? "rgba(245,158,11,0.2)" : "transparent",
+                border: activeTab==="creditos" ? "1px solid #f59e0b" : "1px solid rgba(245,158,11,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color:"#f59e0b",
                 transition:"all 150ms", whiteSpace:"nowrap" }}>
-              ⚡ OCR {creditos && creditos.plan !== "unlimited" ? `(${creditos.creditos_disponibles})` : ""}
+              ⚡ {creditos && creditos.plan !== "unlimited" ? `OCR (${creditos.creditos_disponibles})` : "OCR"}
             </button>
           </div>
           {activeGroup && (
