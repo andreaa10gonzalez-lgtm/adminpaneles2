@@ -2908,8 +2908,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     j.prioridad > 50000 ? "ALTA" : j.prioridad > 10000 ? "MEDIA" : "BAJA"
                   ])
                 ];
-                const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("
-");
+                const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
                 const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
