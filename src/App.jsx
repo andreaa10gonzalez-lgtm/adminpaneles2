@@ -214,7 +214,19 @@ const db = {
   getJugadores: async (tid) => { const { data } = await supabase.from("jugadores").select("*").eq("tenant_id", tid); return data || []; },
   upsertJugadores: async (players) => supabase.from("jugadores").upsert(players, { onConflict: "tenant_id,nombre" }),
   getTransactions: async (tid, fecha) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).eq("fecha", fecha).order("hora"); return data || []; },
-  getAllTransactions: async (tid) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).order("hora"); return data || []; },
+  getAllTransactions: async (tid) => {
+    // Supabase default limit is 1000 — fetch all with range
+    let all = [], from = 0, chunk = 1000;
+    while (true) {
+      const { data, error } = await supabase.from("panel_transactions").select("*")
+        .eq("tenant_id", tid).order("fecha").order("hora").range(from, from + chunk - 1);
+      if (error || !data?.length) break;
+      all = all.concat(data);
+      if (data.length < chunk) break;
+      from += chunk;
+    }
+    return all;
+  },
   upsertTransactions: async (txs) => supabase.from("panel_transactions").upsert(txs, { onConflict: "tenant_id,fecha,hora,jugador,tipo" }),
   getJugadorStats: async (tid, mes) => { const { data } = await supabase.from("jugador_stats").select("*").eq("tenant_id", tid).eq("mes", mes); return data || []; },
   getContactos: async (tid) => { const { data } = await supabase.from("jugadores_contactos").select("*").eq("tenant_id", tid).order("total_cargas", {ascending:false}); return data || []; },
