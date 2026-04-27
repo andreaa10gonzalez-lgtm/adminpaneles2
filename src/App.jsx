@@ -2080,7 +2080,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
     const { data: tenantData } = await supabase.from("tenants").select("fecha_vencimiento,plan_activo,plan_nombre").eq("id", tid).single();
     setVencimiento(tenantData);
 
-    // Check for suspicious cargas and generate notifications
+    // Check for suspicious cargas and generate notifications (wrapped in try/catch so it never breaks the main load)
+    try {
     const todayCheck = new Date().toISOString().slice(0,10);
     const [txsHoyData, msgsHoyData, ocrHoyData] = await Promise.all([
       // Today's casino transactions
@@ -2144,6 +2145,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
         setNotificaciones(newNotifs || []);
       }
     }
+    } catch(e) { console.log("GTP: suspicious check error", e.message); }
 
     // Refresh jugador_stats in background from panel_transactions
     supabase.rpc('refresh_jugador_stats').then(() => {
