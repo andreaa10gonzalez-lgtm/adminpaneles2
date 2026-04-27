@@ -984,22 +984,46 @@ const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, ca
 const Movimientos = ({ tid, supabase, fmt }) => {
   const [txs, setTxs]         = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fecha, setFecha]     = useState(todayStr());
+  const [fechaDesde, setFechaDesde] = useState(todayStr());
+  const [fechaHasta, setFechaHasta] = useState(todayStr());
+  const [horaDesde, setHoraDesde]   = useState("");
+  const [horaHasta, setHoraHasta]   = useState("");
   const [filter, setFilter]   = useState("all");
+  const [modoRango, setModoRango] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+    let query = supabase
       .from("panel_transactions")
       .select("*")
       .eq("tenant_id", tid)
-      .eq("fecha", fecha)
+      .order("fecha", { ascending: false })
       .order("hora", { ascending: false });
-    setTxs(data || []);
+
+    if (modoRango) {
+      query = query.gte("fecha", fechaDesde).lte("fecha", fechaHasta);
+    } else {
+      query = query.eq("fecha", fechaDesde);
+    }
+
+    const { data } = await query.limit(2000);
+    let result = data || [];
+
+    // Filter by time range if set
+    if (horaDesde || horaHasta) {
+      result = result.filter(t => {
+        const h = t.hora?.slice(0,5) || "00:00";
+        if (horaDesde && h < horaDesde) return false;
+        if (horaHasta && h > horaHasta) return false;
+        return true;
+      });
+    }
+
+    setTxs(result);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [fecha]);
+  useEffect(() => { load(); }, [fechaDesde, fechaHasta, modoRango]);
 
   const filtered = filter === "all" ? txs : txs.filter(t => t.tipo === filter);
   const totalCargas  = txs.filter(t => t.tipo === "carga").reduce((s, t) => s + (+t.monto || 0), 0);
@@ -1008,13 +1032,66 @@ const Movimientos = ({ tid, supabase, fmt }) => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
         <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>
           📊 Movimientos capturados
         </h2>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...S.input, width: "auto", padding: "8px 12px" }} />
-          <button onClick={load} style={{ ...S.ghost, padding: "8px 14px" }}>↺ Actualizar</button>
+        <button onClick={load} style={{ ...S.ghost, padding: "8px 14px" }}>↺ Actualizar</button>
+      </div>
+
+      {/* Filtros de fecha y hora */}
+      <div style={{ ...S.card, marginBottom:16, display:"flex", flexWrap:"wrap", gap:12, alignItems:"center" }}>
+        <div style={{ display:"flex", gap:6 }}>
+          <button onClick={() => setModoRango(false)}
+            style={{ padding:"6px 14px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
+              background: !modoRango ? "rgba(124,58,237,0.15)" : "transparent",
+              borderColor: !modoRango ? "#7c3aed" : "#1e1a38", color: !modoRango ? "#a78bfa" : "#64748b" }}>
+            📅 Un día
+          </button>
+          <button onClick={() => setModoRango(true)}
+            style={{ padding:"6px 14px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
+              background: modoRango ? "rgba(124,58,237,0.15)" : "transparent",
+              borderColor: modoRango ? "#7c3aed" : "#1e1a38", color: modoRango ? "#a78bfa" : "#64748b" }}>
+            📆 Rango de fechas
+          </button>
+        </div>
+
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          {modoRango ? (
+            <>
+              <span style={{ fontSize:12, color:"#64748b" }}>Desde</span>
+              <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+                style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }} />
+              <span style={{ fontSize:12, color:"#64748b" }}>Hasta</span>
+              <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
+                style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }} />
+            </>
+          ) : (
+            <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+              style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }} />
+          )}
+        </div>
+
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <span style={{ fontSize:12, color:"#64748b" }}>🕐 Hora</span>
+          <input type="time" value={horaDesde} onChange={e => setHoraDesde(e.target.value)}
+            style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }}
+            placeholder="desde" />
+          <span style={{ fontSize:12, color:"#64748b" }}>—</span>
+          <input type="time" value={horaHasta} onChange={e => setHoraHasta(e.target.value)}
+            style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }}
+            placeholder="hasta" />
+          <button onClick={load} style={{ padding:"6px 12px", borderRadius:8, background:"rgba(124,58,237,0.15)",
+            border:"1px solid #7c3aed", color:"#a78bfa", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+            Filtrar
+          </button>
+          {(horaDesde || horaHasta) && (
+            <button onClick={() => { setHoraDesde(""); setHoraHasta(""); setTimeout(load,100); }}
+              style={{ padding:"6px 10px", borderRadius:8, background:"transparent",
+                border:"1px solid #1e1a38", color:"#64748b", fontSize:11, cursor:"pointer" }}>
+              ✕ Limpiar hora
+            </button>
+          )}
         </div>
       </div>
 
@@ -1036,7 +1113,7 @@ const Movimientos = ({ tid, supabase, fmt }) => {
       {/* Source info */}
       <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 12, color: "#a78bfa", display: "flex", alignItems: "center", gap: 8 }}>
         <span>🔌</span>
-        <span>Estos movimientos fueron capturados automáticamente por la extensión. Para agregar más, abrí la plataforma del casino con la extensión activa.</span>
+        <span>Movimientos capturados por la extensión. {modoRango ? `${fechaDesde} al ${fechaHasta}` : fechaDesde}{horaDesde || horaHasta ? ` · ${horaDesde||"00:00"} — ${horaHasta||"23:59"}` : ""}</span>
       </div>
 
       {/* Filter */}
@@ -1541,6 +1618,8 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
   const [loading, setLoading] = useState(true);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
   const [filtro, setFiltro] = useState("all");
+  const [horaDesde, setHoraDesde] = useState("");
+  const [horaHasta, setHoraHasta] = useState("");
 
   const KEYWORDS_CONFIRMACION = ["cargad", "fichas ya fueron", "acredit", "cargoo", "cargadoo", "ya cargue", "ya te cargue", "listo cargado", "ya está cargado"];
   const WINDOW_MIN = 30;
@@ -1574,7 +1653,15 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
     KEYWORDS_CONFIRMACION.some(kw => m.message_text?.toLowerCase().includes(kw))
   );
 
-  const txsDia = (allTxsByFecha[fecha] || []).filter(t => t.tipo === "carga");
+  const txsDia = (allTxsByFecha[fecha] || []).filter(t => {
+    if (t.tipo !== "carga") return false;
+    if (horaDesde || horaHasta) {
+      const h = t.hora?.slice(0,5) || "00:00";
+      if (horaDesde && h < horaDesde) return false;
+      if (horaHasta && h > horaHasta) return false;
+    }
+    return true;
+  });
 
   // OCR comprobantes that have NO matching casino transaction yet = "pendientes"
   const TIMEOUT_HORAS = 2; // hours before pending becomes suspicious
@@ -1669,8 +1756,18 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
       </div>
 
       <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap", alignItems:"center" }}>
-        <input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setLoading(true); }}
-          style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"8px 12px", fontSize:13 }} />
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setLoading(true); }}
+            style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"8px 12px", fontSize:13 }} />
+          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+            <span style={{ fontSize:12, color:"#64748b" }}>🕐</span>
+            <input type="time" value={horaDesde||""} onChange={e => setHoraDesde(e.target.value)}
+              style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"6px 10px", fontSize:12 }} />
+            <span style={{ fontSize:12, color:"#64748b" }}>—</span>
+            <input type="time" value={horaHasta||""} onChange={e => setHoraHasta(e.target.value)}
+              style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"6px 10px", fontSize:12 }} />
+          </div>
+        </div>
         <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
           {[["all","Todas"],["ok","✅ Verificadas"],["sospechosa","⚠️ Sospechosas"],["pendiente","⏳ Pendientes"]].map(([v,l]) => (
             <button key={v} onClick={() => setFiltro(v)}
