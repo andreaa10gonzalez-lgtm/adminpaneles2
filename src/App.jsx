@@ -1401,23 +1401,161 @@ const ExtensionSettings = ({ tid }) => {
 };
 
 // ─── COMMS MENSAJES ───────────────────────────────────────────────────────────
-const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
-  const [mensajesWA, setMensajesWA] = useState([]);
+const CargasIA = ({ tid, supabase, fmt }) => {
+  const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
-  const [filtro, setFiltro] = useState("all"); // all | ok | sospechosa
-
-  const KEYWORDS_CONFIRMACION = ["cargad", "fichas ya fueron", "acredit", "cargoo", "cargadoo", "ya cargue", "ya te cargue", "listo cargado", "ya está cargado"];
-  const WINDOW_MIN = 30; // minutos de ventana para cruce
+  const [filtro, setFiltro] = useState("all"); // all | carga | retiro
+  const [dias, setDias] = useState(7);
 
   useEffect(() => {
-    supabase.from("ext_messages")
+    setLoading(true);
+    const desde = new Date(Date.now() - dias * 86400000).toISOString();
+    supabase.from("ocr_uso")
       .select("*")
       .eq("tenant_id", tid)
-      .eq("message_type", "outgoing")
-      .gte("timestamp", fecha + "T00:00:00")
-      .lte("timestamp", fecha + "T23:59:59")
-      .then(({ data }) => { setMensajesWA(data || []); setLoading(false); });
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setDatos((data || []).filter(r => r.imagen_resultado?.es_comprobante));
+        setLoading(false);
+      });
+  }, [dias]);
+
+  const filtrados = datos.filter(r => {
+    if (filtro === "all") return true;
+    return r.imagen_resultado?.tipo === filtro;
+  });
+
+  const totalCargas = datos.filter(r => r.imagen_resultado?.tipo === "carga").length;
+  const totalRetiros = datos.filter(r => r.imagen_resultado?.tipo === "retiro").length;
+  const montoCargas = datos.filter(r => r.imagen_resultado?.tipo === "carga")
+    .reduce((s, r) => s + (+r.imagen_resultado?.monto || 0), 0);
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+        <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>🤖</div>
+        <div style={{ flex:1 }}>
+          <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#a78bfa" }}>Cargas detectadas por IA</h2>
+          <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Comprobantes detectados automáticamente en WhatsApp</p>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", gap:10, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
+        {[7,15,30].map(d => (
+          <button key={d} onClick={() => setDias(d)}
+            style={{ padding:"6px 14px", borderRadius:20, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
+              background: dias===d ? "rgba(124,58,237,0.2)" : "transparent",
+              borderColor: dias===d ? "#7c3aed" : "#1e1a38",
+              color: dias===d ? "#a78bfa" : "#64748b" }}>
+            {d} días
+          </button>
+        ))}
+        <div style={{ marginLeft:"auto", display:"flex", gap:6 }}>
+          {[["all","Todos"],["carga","💰 Cargas"],["retiro","💸 Retiros"]].map(([v,l]) => (
+            <button key={v} onClick={() => setFiltro(v)}
+              style={{ padding:"6px 12px", borderRadius:20, border:"1px solid", fontSize:11, fontWeight:600, cursor:"pointer",
+                background: filtro===v ? "rgba(124,58,237,0.15)" : "transparent",
+                borderColor: filtro===v ? "#7c3aed" : "#1e1a38",
+                color: filtro===v ? "#a78bfa" : "#64748b" }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:16 }}>
+        {[
+          { label:"Comprobantes detectados", v:datos.length, c:"#a78bfa" },
+          { label:"💰 Cargas detectadas", v:totalCargas, c:"#10b981" },
+          { label:"Monto total cargas", v:fmt(montoCargas), c:"#f59e0b" },
+        ].map(x => (
+          <div key={x.label} style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:"12px 16px" }}>
+            <div style={{ fontSize:10,color:"#64748b",marginBottom:4 }}>{x.label}</div>
+            <div style={{ fontSize:20,fontWeight:800,color:x.c }}>{x.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div>
+      ) : filtrados.length === 0 ? (
+        <div style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:40,textAlign:"center",color:"#64748b" }}>
+          <div style={{ fontSize:32,marginBottom:8 }}>🤖</div>
+          <div>No hay comprobantes detectados en los últimos {dias} días.</div>
+          <div style={{ fontSize:12,marginTop:8 }}>Los comprobantes aparecen cuando los clientes mandan imágenes por WhatsApp y la IA las analiza.</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+          {filtrados.map((r,i) => {
+            const res = r.imagen_resultado;
+            const esCarga = res.tipo === "carga";
+            return (
+              <div key={i} style={{ background:"#0f0d1f",border:"1px solid",borderRadius:12,padding:"12px 16px",
+                borderColor: esCarga ? "rgba(16,185,129,0.25)" : "rgba(244,63,94,0.25)" }}>
+                <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+                  <div style={{ fontSize:24 }}>{esCarga ? "💰" : "💸"}</div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9" }}>
+                      {esCarga ? "Carga" : "Retiro"} de <span style={{ color: esCarga ? "#10b981" : "#f43f5e" }}>${res.monto?.toLocaleString() || "?"}</span>
+                      {res.jugador && <span style={{ color:"#a78bfa",marginLeft:8 }}>· {res.jugador}</span>}
+                    </div>
+                    <div style={{ fontSize:11,color:"#64748b",marginTop:2 }}>
+                      {r.chat_id && <span>De: {r.chat_id} · </span>}
+                      {res.banco_origen && <span>{res.banco_origen} · </span>}
+                      {new Date(r.created_at).toLocaleString("es-AR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right",flexShrink:0 }}>
+                    <div style={{ fontSize:11,fontWeight:600,
+                      color: res.confianza==="alta" ? "#10b981" : res.confianza==="media" ? "#f59e0b" : "#f43f5e" }}>
+                      Confianza {res.confianza}
+                    </div>
+                    <div style={{ fontSize:10,color:"#64748b" }}>{r.tokens_usados} tokens</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
+  const [mensajesWA, setMensajesWA] = useState([]);
+  const [ocrResultados, setOcrResultados] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
+  const [filtro, setFiltro] = useState("all");
+
+  const KEYWORDS_CONFIRMACION = ["cargad", "fichas ya fueron", "acredit", "cargoo", "cargadoo", "ya cargue", "ya te cargue", "listo cargado", "ya está cargado"];
+  const WINDOW_MIN = 30;
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      // WhatsApp messages
+      supabase.from("ext_messages")
+        .select("*")
+        .eq("tenant_id", tid)
+        .eq("message_type", "outgoing")
+        .gte("timestamp", fecha + "T00:00:00")
+        .lte("timestamp", fecha + "T23:59:59")
+        .then(({ data }) => data || []),
+      // OCR results for this day
+      supabase.from("ocr_uso")
+        .select("*")
+        .eq("tenant_id", tid)
+        .gte("created_at", fecha + "T00:00:00")
+        .lte("created_at", fecha + "T23:59:59")
+        .then(({ data }) => (data || []).filter(r => r.imagen_resultado?.es_comprobante))
+    ]).then(([msgs, ocr]) => {
+      setMensajesWA(msgs);
+      setOcrResultados(ocr);
+      setLoading(false);
+    });
   }, [fecha]);
 
   const confirmaciones = mensajesWA.filter(m =>
@@ -1426,12 +1564,55 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
 
   const txsDia = (allTxsByFecha[fecha] || []).filter(t => t.tipo === "carga");
 
+  // OCR comprobantes that have NO matching casino transaction yet = "pendientes"
+  const TIMEOUT_HORAS = 2; // hours before pending becomes suspicious
+  const ocrSinTransaccion = ocrResultados.filter(r => {
+    const res = r.imagen_resultado;
+    if (!res?.monto || res.tipo !== "carga") return false;
+    const rTime = new Date(r.created_at).getTime();
+    const montoOCR = +res.monto || 0;
+    // Check if there's a matching casino transaction
+    const tieneMatch = txsDia.some(tx => {
+      const txTime = new Date(fecha + "T" + (tx.hora || "00:00:00")).getTime();
+      const enRango = Math.abs(rTime - txTime) <= WINDOW_MIN * 60 * 1000;
+      const montosCoinciden = Math.abs(montoOCR - (+tx.monto||0)) / Math.max(+tx.monto||1, 1) < 0.1;
+      return enRango && montosCoinciden;
+    });
+    return !tieneMatch;
+  }).map(r => {
+    const horasEspera = (Date.now() - new Date(r.created_at).getTime()) / 3600000;
+    return {
+      ...r,
+      tipo: "pendiente_ocr",
+      horasEspera: Math.round(horasEspera * 10) / 10,
+      vencido: horasEspera > TIMEOUT_HORAS,
+    };
+  });
+
+  // Casino transactions cross-check (only casino → WA direction)
   const cruce = txsDia.map(tx => {
     const txTime = new Date(fecha + "T" + (tx.hora || "00:00:00")).getTime();
     const jugadorNorm = (tx.jugador || "").toLowerCase().trim();
+    const montoTx = +tx.monto || 0;
 
-    // Cruce por NOMBRE + HORARIO combinados (más preciso)
-    const porNombreYHorario = jugadorNorm.length > 3 ? mensajesWA.find(m => {
+    // Método 1: OCR match
+    const porOCR = ocrResultados.find(r => {
+      const res = r.imagen_resultado;
+      if (!res?.monto) return false;
+      const mTime = new Date(r.created_at).getTime();
+      const enRango = Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
+      if (!enRango) return false;
+      const montoOCR = +res.monto || 0;
+      const montosCoinciden = montoOCR > 0 && Math.abs(montoOCR - montoTx) / Math.max(montoTx, 1) < 0.1;
+      if (res.jugador && jugadorNorm.length > 3) {
+        const jugOCRNorm = res.jugador.toLowerCase().trim();
+        return montosCoinciden && (jugOCRNorm.includes(jugadorNorm) || jugadorNorm.includes(jugOCRNorm));
+      }
+      return montosCoinciden;
+    });
+
+    // Método 2: WA nombre + horario
+    const porNombreYHorario = !porOCR && jugadorNorm.length > 3 ? mensajesWA.find(m => {
       const mTime = new Date(m.timestamp).getTime();
       const enRango = Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
       if (!enRango) return false;
@@ -1441,19 +1622,21 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
              senderNorm.includes(jugadorNorm) || jugadorNorm.includes(senderNorm);
     }) : null;
 
-    // Cruce solo por horario con mensaje de confirmación (fallback)
-    const porHorario = !porNombreYHorario ? confirmaciones.find(m => {
+    // Método 3: WA solo horario (fallback)
+    const porHorario = !porOCR && !porNombreYHorario ? confirmaciones.find(m => {
       const mTime = new Date(m.timestamp).getTime();
       return Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
     }) : null;
 
-    const confirmacion = porNombreYHorario || porHorario || null;
-    const metodo = porNombreYHorario ? "nombre+horario" : porHorario ? "horario" : null;
+    const confirmacion = porOCR || porNombreYHorario || porHorario || null;
+    const metodo = porOCR ? "ocr" : porNombreYHorario ? "nombre+horario" : porHorario ? "horario" : null;
+    const ocrData = porOCR?.imagen_resultado || null;
 
     return {
       ...tx,
       confirmacion,
       metodo,
+      ocrData,
       estado: confirmacion ? "ok" : "sospechosa",
     };
   });
@@ -1476,23 +1659,24 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
       <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap", alignItems:"center" }}>
         <input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setLoading(true); }}
           style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"8px 12px", fontSize:13 }} />
-        <div style={{ display:"flex", gap:6 }}>
-          {[["all","Todas"],["ok","✅ Verificadas"],["sospechosa","⚠️ Sospechosas"]].map(([v,l]) => (
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+          {[["all","Todas"],["ok","✅ Verificadas"],["sospechosa","⚠️ Sospechosas"],["pendiente","⏳ Pendientes"]].map(([v,l]) => (
             <button key={v} onClick={() => setFiltro(v)}
               style={{ padding:"7px 14px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
-                background: filtro===v ? (v==="sospechosa"?"rgba(244,63,94,0.15)":v==="ok"?"rgba(16,185,129,0.15)":"rgba(124,58,237,0.15)") : "transparent",
-                borderColor: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="ok"?"#10b981":"#7c3aed") : "#1e1a38",
-                color: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="ok"?"#10b981":"#a78bfa") : "#64748b" }}>
+                background: filtro===v ? (v==="sospechosa"?"rgba(244,63,94,0.15)":v==="pendiente"?"rgba(245,158,11,0.15)":v==="ok"?"rgba(16,185,129,0.15)":"rgba(124,58,237,0.15)") : "transparent",
+                borderColor: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="pendiente"?"#f59e0b":v==="ok"?"#10b981":"#7c3aed") : "#1e1a38",
+                color: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="pendiente"?"#f59e0b":v==="ok"?"#10b981":"#a78bfa") : "#64748b" }}>
               {l}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
         {[
           { label:"Total cargas", v:cruce.length, c:"#f59e0b" },
           { label:"✅ Verificadas", v:ok, c:"#10b981" },
+          { label:"⏳ Pendientes WA", v:ocrSinTransaccion.length, c:"#f59e0b" },
           { label:"⚠️ Sospechosas", v:sospechosas, c:"#f43f5e" },
         ].map(x => (
           <div key={x.label} style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:12, padding:"14px 16px" }}>
@@ -1502,11 +1686,46 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
         ))}
       </div>
 
-      {loading ? <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div> : filtradas.length === 0 ? (
+      {/* Pendientes OCR — comprobantes WA sin transaccion en el casino aun */}
+      {(filtro === "all" || filtro === "pendiente") && ocrSinTransaccion.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:13,fontWeight:700,color:"#f59e0b",marginBottom:8 }}>
+            ⏳ Comprobantes WA esperando transacción en el casino
+          </div>
+          <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+            {ocrSinTransaccion.map((r,i) => {
+              const res = r.imagen_resultado;
+              return (
+                <div key={i} style={{ background:"#0f0d1f", border:"1px solid", borderRadius:12, padding:"12px 16px",
+                  borderColor: r.vencido ? "rgba(244,63,94,0.4)" : "rgba(245,158,11,0.3)" }}>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+                    <div>
+                      <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:3 }}>
+                        {r.vencido ? "🚨" : "⏳"} Comprobante OCR — ${res.monto?.toLocaleString()}
+                        {res.jugador && <span style={{ color:"#a78bfa",marginLeft:8 }}>{res.jugador}</span>}
+                      </div>
+                      <div style={{ fontSize:11,color:"#64748b" }}>
+                        {r.chat_id} · {res.banco_origen || ""} · hace {r.horasEspera}h
+                        {r.vencido && <span style={{ color:"#f43f5e",fontWeight:700,marginLeft:8 }}>⚠️ Superó el tiempo de espera</span>}
+                      </div>
+                    </div>
+                    <div style={{ fontSize:11,fontWeight:700,
+                      color: r.vencido ? "#f43f5e" : "#f59e0b" }}>
+                      {r.vencido ? "Sin carga en casino" : "Esperando captura..."}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {loading ? <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div> : filtradas.length === 0 && filtro !== "pendiente" ? (
         <div style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:40,textAlign:"center",color:"#64748b" }}>
           No hay cargas para esta fecha
         </div>
-      ) : (
+      ) : filtro !== "pendiente" && (
         <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
           {filtradas.map((c,i) => (
             <div key={i} style={{ background:"#0f0d1f", border:"1px solid", borderRadius:12, padding:"12px 16px",
@@ -1535,15 +1754,22 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
                 </div>
                 <div style={{ textAlign:"right",flexShrink:0 }}>
                   {c.estado==="ok" ? (
-                    <div style={{ fontSize:11,color:"#10b981",fontWeight:600 }}>
-                      ✅ {c.metodo === "nombre+horario" ? "Verificada · nombre + hora" : "Verificada · solo horario"}
+                    <div style={{ fontSize:11,fontWeight:600,color:"#10b981" }}>
+                      {c.metodo==="ocr" ? "🤖 Verificada · comprobante IA" :
+                       c.metodo==="nombre+horario" ? "✅ Verificada · nombre + hora" :
+                       "✅ Verificada · solo horario"}
                     </div>
                   ) : (
-                    <div style={{ fontSize:11,color:"#f43f5e",fontWeight:600 }}>⚠️ Sin confirmación WA</div>
+                    <div style={{ fontSize:11,color:"#f43f5e",fontWeight:600 }}>⚠️ Sin confirmación</div>
                   )}
                 </div>
               </div>
-              {c.confirmacion && (
+              {c.ocrData && (
+                <div style={{ marginTop:8,background:"rgba(124,58,237,0.05)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#a78bfa" }}>
+                  🤖 Comprobante OCR: ${c.ocrData.monto?.toLocaleString()} · {c.ocrData.banco_origen || "banco"} · confianza {c.ocrData.confianza}
+                </div>
+              )}
+              {!c.ocrData && c.confirmacion && (
                 <div style={{ marginTop:8,background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#94a3b8" }}>
                   💬 "{c.confirmacion.message_text?.slice(0,80)}"
                 </div>
@@ -1853,6 +2079,71 @@ const OwnerDashboard = ({ session, onLogout }) => {
     // Load vencimiento
     const { data: tenantData } = await supabase.from("tenants").select("fecha_vencimiento,plan_activo,plan_nombre").eq("id", tid).single();
     setVencimiento(tenantData);
+
+    // Check for suspicious cargas and generate notifications
+    const todayCheck = new Date().toISOString().slice(0,10);
+    const [txsHoyData, msgsHoyData, ocrHoyData] = await Promise.all([
+      // Today's casino transactions
+      Promise.resolve(Object.values(byFecha[todayCheck] || []).filter(t => t.tipo === "carga")),
+      // Today's WA messages
+      supabase.from("ext_messages").select("*").eq("tenant_id", tid)
+        .gte("timestamp", todayCheck + "T00:00:00").eq("message_type","outgoing")
+        .then(r => r.data || []),
+      // Today's OCR results
+      supabase.from("ocr_uso").select("*").eq("tenant_id", tid)
+        .gte("created_at", todayCheck + "T00:00:00")
+        .then(r => (r.data || []).filter(x => x.imagen_resultado?.es_comprobante))
+    ]);
+
+    const KEYWORDS_CHECK = ["cargad","fichas ya fueron","acredit","cargoo","cargadoo"];
+    const confirmacionesHoy = msgsHoyData.filter(m =>
+      KEYWORDS_CHECK.some(kw => m.message_text?.toLowerCase().includes(kw))
+    );
+    const WINDOW_MS = 30 * 60 * 1000;
+
+    const sospechasHoy = txsHoyData.filter(tx => {
+      const txTime = new Date(todayCheck + "T" + (tx.hora || "00:00:00")).getTime();
+      const jugNorm = (tx.jugador || "").toLowerCase().trim();
+      // Check OCR
+      const tieneOCR = ocrHoyData.some(r => {
+        const mTime = new Date(r.created_at).getTime();
+        return Math.abs(mTime - txTime) <= WINDOW_MS &&
+               Math.abs((+r.imagen_resultado?.monto||0) - (+tx.monto||0)) / Math.max(+tx.monto||1, 1) < 0.1;
+      });
+      if (tieneOCR) return false;
+      // Check WA
+      const tieneWA = jugNorm.length > 3
+        ? msgsHoyData.some(m => {
+            const mTime = new Date(m.timestamp).getTime();
+            if (Math.abs(mTime - txTime) > WINDOW_MS) return false;
+            const cn = (m.chat_id||"").toLowerCase();
+            return cn.includes(jugNorm) || jugNorm.includes(cn);
+          })
+        : confirmacionesHoy.some(m => Math.abs(new Date(m.timestamp).getTime() - txTime) <= WINDOW_MS);
+      return !tieneWA;
+    });
+
+    // Generate notification if there are suspicious cargas
+    // Only flag as sospechosa if there's no OCR comprobante pending for that tx
+    if (sospechasHoy.length > 0) {
+      const existente = (notifs || []).find(n =>
+        n.tipo === "sospechosa" && n.fecha === todayCheck
+      );
+      if (!existente) {
+        await supabase.from("notificaciones").insert({
+          tenant_id: tid,
+          tipo: "sospechosa",
+          fecha: todayCheck,
+          mensaje: `⚠️ ${sospechasHoy.length} carga${sospechasHoy.length>1?"s":""} sin respaldo en WhatsApp ni comprobante`,
+          leida: false,
+          datos: JSON.stringify(sospechasHoy.slice(0,5).map(t => ({jugador:t.jugador,monto:t.monto,hora:t.hora}))),
+          created_at: new Date().toISOString()
+        });
+        const { data: newNotifs } = await supabase.from("notificaciones")
+          .select("*").eq("tenant_id", tid).order("created_at",{ascending:false}).limit(20);
+        setNotificaciones(newNotifs || []);
+      }
+    }
 
     // Refresh jugador_stats in background from panel_transactions
     supabase.rpc('refresh_jugador_stats').then(() => {
@@ -2218,6 +2509,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
       { id: "comms_mensajes",  label: "Mensajes",   desc: "Mensajes y tiempos de respuesta" },
       { id: "comms_jugadores", label: "Jugadores",  desc: "Base de jugadores detectados" },
       { id: "rendimiento",     label: "Rendimiento", desc: "Tiempo de respuesta por empleado" },
+      { id: "cargas_ia",      label: "Cargas IA",   desc: "Cargas detectadas por IA en WhatsApp" },
     ]},
   ];
   const activeGroup = NAV_GROUPS.find(g => g.items.some(i => i.id === activeTab));
@@ -3586,6 +3878,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
             </div>
             <CommsMonitor tenantId={tid} supabase={supabase} empleados={empleados} showRendimiento={true} />
           </div>
+        )}
+
+        {activeTab === "cargas_ia" && (
+          <CargasIA tid={tid} supabase={supabase} fmt={fmt} />
         )}
 
         {activeTab === "empleados_hist" && (
