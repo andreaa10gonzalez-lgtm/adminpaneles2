@@ -2362,9 +2362,30 @@ const OwnerDashboard = ({ session, onLogout }) => {
   // ── Derived ──
   const cmEntries = entries.filter(e => e.fecha?.startsWith(cmk()));
   const pmEntries = entries.filter(e => e.fecha?.startsWith(pmk()));
-  const cmC = sumK(cmEntries, "cargas"), cmR = sumK(cmEntries, "retiros"), cmN = cmC - cmR;
-  const pmC = sumK(pmEntries, "cargas"), pmR = sumK(pmEntries, "retiros"), pmN = pmC - pmR;
-  // Comparacion proporcional: promedio diario del mes anterior × dias cargados del mes actual
+
+  // Use panel_transactions (real casino data) for month totals
+  const txCmC = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(cmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="carga").reduce((a,t)=>a+(+t.monto||0),0), 0);
+  const txCmR = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(cmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="retiro").reduce((a,t)=>a+(+t.monto||0),0), 0);
+  const txPmC = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(pmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="carga").reduce((a,t)=>a+(+t.monto||0),0), 0);
+  const txPmR = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(pmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="retiro").reduce((a,t)=>a+(+t.monto||0),0), 0);
+
+  // Prefer transactions data, fallback to manual entries
+  const cmC = txCmC > 0 ? txCmC : sumK(cmEntries, "cargas");
+  const cmR = txCmR > 0 ? txCmR : sumK(cmEntries, "retiros");
+  const pmC = txPmC > 0 ? txPmC : sumK(pmEntries, "cargas");
+  const pmR = txPmR > 0 ? txPmR : sumK(pmEntries, "retiros");
+  const cmN = cmC - cmR;
+  const pmN = pmC - pmR;
+
+  // Comparacion proporcional
   const cmDias = cmEntries.length;
   const pmDias = pmEntries.length;
   const pmCProp = pmDias > 0 && cmDias > 0 ? (pmC / pmDias) * cmDias : pmC;
