@@ -1528,6 +1528,11 @@ const CargasIA = ({ tid, supabase, fmt }) => {
           <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#a78bfa" }}>Cargas detectadas por IA</h2>
           <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Comprobantes detectados automáticamente en WhatsApp</p>
         </div>
+        <button onClick={() => { setLoading(true); const desde = new Date(Date.now() - dias * 86400000).toISOString(); supabase.from("ocr_uso").select("*").eq("tenant_id", tid).gte("created_at", desde).order("created_at", { ascending: false }).then(({ data }) => { setDatos((data || []).filter(r => r.imagen_resultado?.es_comprobante)); setLoading(false); }); }}
+          style={{ background:"rgba(124,58,237,0.15)", border:"1px solid rgba(124,58,237,0.3)", color:"#a78bfa",
+            padding:"8px 16px", borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", flexShrink:0 }}>
+          ↺ Actualizar
+        </button>
       </div>
 
       <div style={{ display:"flex", gap:10, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
@@ -4133,10 +4138,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <div style={{ fontSize:14,fontWeight:700,color:"#f1f5f9",marginBottom:12 }}>💳 Recargar créditos</div>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:20 }}>
                   {[
-                    { nombre:"Básico", creditos:500, precio_usd:5, precio_ars:"$5.000", desc:"~500 imágenes", color:"#06b6d4" },
-                    { nombre:"Estándar", creditos:1500, precio_usd:13, precio_ars:"$13.000", desc:"~1.500 imágenes", color:"#7c3aed", popular:true },
-                    { nombre:"Pro", creditos:3500, precio_usd:28, precio_ars:"$28.000", desc:"~3.500 imágenes", color:"#f59e0b" },
-                    { nombre:"Ilimitado/día", creditos:99999, precio_usd:10, precio_ars:"$10.000/día", desc:"Sin límite diario", color:"#10b981" },
+                    { nombre:"Básico", creditos:500, precio_usd:3, precio_ars:"$3 USD", desc:"~500 imágenes/día", color:"#06b6d4" },
+                    { nombre:"Estándar", creditos:1500, precio_usd:6, precio_ars:"$6 USD", desc:"~1.500 imágenes/día", color:"#7c3aed", popular:true },
+                    { nombre:"Pro", creditos:2500, precio_usd:10, precio_ars:"$10 USD", desc:"~2.500 imágenes/día", color:"#f59e0b" },
+                    { nombre:"Ilimitado/día", creditos:99999, precio_usd:12, precio_ars:"$12 USD/día", desc:"Sin límite diario", color:"#10b981" },
                   ].map(plan => (
                     <div key={plan.nombre} style={{ ...S.card, border:`1px solid ${plan.color}40`, background:`${plan.color}08`, position:"relative" }}>
                       {plan.popular && (
