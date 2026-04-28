@@ -1158,7 +1158,9 @@ const Movimientos = ({ tid, supabase, fmt }) => {
                         {tx.tipo === "carga" ? "Carga" : "Retiro"}
                       </span>
                     </td>
-                    <td style={{ padding: "9px 14px", color: "#e2e8f0", fontWeight: 500 }}>{tx.jugador || "—"}</td>
+                    <td style={{ padding: "9px 14px", color: "#e2e8f0", fontWeight: 500 }}>
+                      {tx.jugador && !/^\d{4}\/\d{2}\/\d{2}/.test(tx.jugador) ? tx.jugador : "—"}
+                    </td>
                     <td style={{ padding: "9px 14px", fontWeight: 700, color: tx.tipo === "carga" ? "#10b981" : "#f43f5e", fontFamily: "'Space Grotesk',sans-serif" }}>
                       {tx.tipo === "retiro" ? "−" : ""}{fmt(+tx.monto || 0)}
                     </td>
