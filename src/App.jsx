@@ -2829,7 +2829,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
           ))}
           {/* IA y OCR destacados en la nav */}
           <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6, paddingBottom:6, paddingTop:4 }}>
-            <button onClick={() => setActiveTab("ia")}
+            <button onClick={() => { setActiveTab("ia"); }}
               style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
                 background: activeTab==="ia" ? "rgba(124,58,237,0.25)" : "transparent",
                 border: activeTab==="ia" ? "1px solid #7c3aed" : "1px solid rgba(124,58,237,0.25)",
@@ -2838,7 +2838,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 transition:"all 150ms", whiteSpace:"nowrap" }}>
               🤖 IA Analista
             </button>
-            <button onClick={() => setActiveTab("creditos")}
+            <button onClick={() => { setActiveTab("creditos"); }}
               style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
                 background: activeTab==="creditos" ? "rgba(245,158,11,0.2)" : "transparent",
                 border: activeTab==="creditos" ? "1px solid #f59e0b" : "1px solid rgba(245,158,11,0.25)",
@@ -3674,9 +3674,9 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   { label: "Neto del mes", v: fmt(cmN) },
                   { label: "Jugadores activos", v: cmUnicos },
                   { label: "Alertas de caja", v: alertas.length },
-                  { label: "Msgs WA hoy", v: commsData?.totalHoy || "—" },
-                  { label: "Alertas WA", v: commsData?.alertasActivas || "—" },
-                  { label: "Resp. promedio", v: commsData?.avgResp ? Math.floor(commsData.avgResp/60)+"m" : "—" },
+                  { label: "Msgs WA hoy", v: alerts?.length || "—" },
+                  { label: "Alertas WA", v: alerts?.filter(a=>!a.leida).length || 0 },
+                  { label: "Resp. promedio", v: "—" },
                   { label: "Sospechosas", v: "ver cruce" },
                 ].map(x => (
                   <div key={x.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
