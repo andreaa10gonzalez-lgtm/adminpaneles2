@@ -1702,20 +1702,30 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
     const montoTx = +tx.monto || 0;
 
     // Método 1: OCR match
-    const porOCR = ocrResultados.find(r => {
+    // OCR nivel 1: chat_id (username WA) + monto + horario
+    const porOCRNombre = ocrResultados.find(r => {
       const res = r.imagen_resultado;
       if (!res?.monto) return false;
       const mTime = new Date(r.created_at).getTime();
-      const enRango = Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
-      if (!enRango) return false;
+      if (Math.abs(mTime - txTime) > WINDOW_MIN * 60 * 1000) return false;
       const montoOCR = +res.monto || 0;
-      const montosCoinciden = montoOCR > 0 && Math.abs(montoOCR - montoTx) / Math.max(montoTx, 1) < 0.1;
-      if (res.jugador && jugadorNorm.length > 3) {
-        const jugOCRNorm = res.jugador.toLowerCase().trim();
-        return montosCoinciden && (jugOCRNorm.includes(jugadorNorm) || jugadorNorm.includes(jugOCRNorm));
-      }
-      return montosCoinciden;
+      if (Math.abs(montoOCR - montoTx) / Math.max(montoTx, 1) >= 0.1) return false;
+      const chatNorm = (r.chat_id || "").toLowerCase().trim();
+      return jugadorNorm.length > 3 && chatNorm.length > 2 &&
+             (chatNorm.includes(jugadorNorm) || jugadorNorm.includes(chatNorm));
     });
+
+    // OCR nivel 2: solo monto + horario (si no matchea el nombre)
+    const porOCRMonto = !porOCRNombre ? ocrResultados.find(r => {
+      const res = r.imagen_resultado;
+      if (!res?.monto) return false;
+      const mTime = new Date(r.created_at).getTime();
+      if (Math.abs(mTime - txTime) > WINDOW_MIN * 60 * 1000) return false;
+      const montoOCR = +res.monto || 0;
+      return montoOCR > 0 && Math.abs(montoOCR - montoTx) / Math.max(montoTx, 1) < 0.1;
+    }) : null;
+
+    const porOCR = porOCRNombre || porOCRMonto || null;
 
     // Método 2: WA nombre + horario
     const porNombreYHorario = !porOCR && jugadorNorm.length > 3 ? mensajesWA.find(m => {
@@ -1735,7 +1745,7 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
     }) : null;
 
     const confirmacion = porOCR || porNombreYHorario || porHorario || null;
-    const metodo = porOCR ? "ocr" : porNombreYHorario ? "nombre+horario" : porHorario ? "horario" : null;
+    const metodo = porOCRNombre ? "ocr+nombre" : porOCRMonto ? "ocr+monto" : porNombreYHorario ? "nombre+horario" : porHorario ? "horario" : null;
     const ocrData = porOCR?.imagen_resultado || null;
 
     return {
@@ -1845,7 +1855,8 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
         <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
           {filtradas.map((c,i) => (
             <div key={i} style={{ background:"#0f0d1f", border:"1px solid", borderRadius:12, padding:"12px 16px",
-              borderColor: c.estado==="ok" ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.3)" }}>
+              borderColor: c.estado==="ok" ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.5)",
+              background: c.estado==="sospechosa" ? "rgba(244,63,94,0.05)" : "#0f0d1f" }}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap" }}>
                 <div>
                   <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:4 }}>
@@ -1876,7 +1887,7 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
                        "✅ Verificada · solo horario"}
                     </div>
                   ) : (
-                    <div style={{ fontSize:11,color:"#f43f5e",fontWeight:600 }}>⚠️ Sin confirmación</div>
+                    <div style={{ fontSize:11,color:"#f43f5e",fontWeight:600 }}>🚨 Sin comprobante — SOSPECHOSA</div>
                   )}
                 </div>
               </div>
@@ -2251,7 +2262,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
           tenant_id: tid,
           tipo: "sospechosa",
           fecha: todayCheck,
-          mensaje: `⚠️ ${sospechasHoy.length} carga${sospechasHoy.length>1?"s":""} sin respaldo en WhatsApp ni comprobante`,
+          mensaje: `🚨 ${sospechasHoy.length} carga${sospechasHoy.length>1?"s":""} en el casino sin comprobante de pago — posible fraude`,
           leida: false,
           datos: JSON.stringify(sospechasHoy.slice(0,5).map(t => ({jugador:t.jugador,monto:t.monto,hora:t.hora}))),
           created_at: new Date().toISOString()
@@ -2261,6 +2272,43 @@ const OwnerDashboard = ({ session, onLogout }) => {
         setNotificaciones(newNotifs || []);
       }
     }
+
+    // Notificación: comprobantes OCR sin carga en el casino después de 2 horas
+    const ocrVencidosHoy = ocrHoyData.filter(r => {
+      if (!r.imagen_resultado?.es_comprobante) return false;
+      const horasEspera = (Date.now() - new Date(r.created_at).getTime()) / 3600000;
+      if (horasEspera < 2) return false; // esperar 2 horas antes de alertar
+      const montoOCR = +r.imagen_resultado?.monto || 0;
+      if (!montoOCR) return false;
+      // Check if there's a matching casino transaction
+      return !txsHoyData.some(tx => {
+        const txTime = new Date(todayCheck + "T" + (tx.hora || "00:00:00")).getTime();
+        const rTime = new Date(r.created_at).getTime();
+        return Math.abs(rTime - txTime) <= 30 * 60 * 1000 &&
+               Math.abs(montoOCR - (+tx.monto||0)) / Math.max(+tx.monto||1, 1) < 0.1;
+      });
+    });
+
+    if (ocrVencidosHoy.length > 0) {
+      const existenteOCR = (notifs || []).find(n =>
+        n.tipo === "comprobante_sin_carga" && n.fecha === todayCheck
+      );
+      if (!existenteOCR) {
+        await supabase.from("notificaciones").insert({
+          tenant_id: tid,
+          tipo: "comprobante_sin_carga",
+          fecha: todayCheck,
+          mensaje: `⚠️ ${ocrVencidosHoy.length} comprobante${ocrVencidosHoy.length>1?"s":""} de WhatsApp sin carga correspondiente en el casino`,
+          leida: false,
+          datos: JSON.stringify(ocrVencidosHoy.slice(0,5).map(r => ({chat_id:r.chat_id, monto:r.imagen_resultado?.monto, hora:r.created_at}))),
+          created_at: new Date().toISOString()
+        });
+        const { data: newNotifs } = await supabase.from("notificaciones")
+          .select("*").eq("tenant_id", tid).order("created_at",{ascending:false}).limit(20);
+        setNotificaciones(newNotifs || []);
+      }
+    }
+
     } catch(e) { console.log("GTP: suspicious check error", e.message); }
 
     // Refresh jugador_stats in background from panel_transactions
