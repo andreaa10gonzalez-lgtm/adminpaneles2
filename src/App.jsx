@@ -2212,7 +2212,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
     const todayCheck = new Date().toISOString().slice(0,10);
     const [txsHoyData, msgsHoyData, ocrHoyData] = await Promise.all([
       // Today's casino transactions
-      Promise.resolve(Object.values(byFecha[todayCheck] || []).filter(t => t.tipo === "carga")),
+      Promise.resolve(Object.values(allTxsByFecha[todayCheck] || []).filter(t => t.tipo === "carga")),
       // Today's WA messages
       supabase.from("ext_messages").select("*").eq("tenant_id", tid)
         .gte("timestamp", todayCheck + "T00:00:00").eq("message_type","outgoing")
@@ -3674,8 +3674,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   { label: "Neto del mes", v: fmt(cmN) },
                   { label: "Jugadores activos", v: cmUnicos },
                   { label: "Alertas de caja", v: alertas.length },
-                  { label: "Msgs WA hoy", v: alerts?.length || "—" },
-                  { label: "Alertas WA", v: alerts?.filter(a=>!a.leida).length || 0 },
+                  { label: "Msgs WA hoy", v: "—" },
+                  { label: "Alertas WA", v: alertas?.filter(a=>!a.leida).length || 0 },
                   { label: "Resp. promedio", v: "—" },
                   { label: "Sospechosas", v: "ver cruce" },
                 ].map(x => (
