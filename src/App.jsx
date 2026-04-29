@@ -2541,11 +2541,11 @@ const OwnerDashboard = ({ session, onLogout }) => {
     .filter(([f]) => f.startsWith(pmk()))
     .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="retiro").reduce((a,t)=>a+(+t.monto||0),0), 0);
 
-  // Prefer transactions data, fallback to manual entries
-  const cmC = txCmC > 0 ? txCmC : sumK(cmEntries, "cargas");
-  const cmR = txCmR > 0 ? txCmR : sumK(cmEntries, "retiros");
-  const pmC = txPmC > 0 ? txPmC : sumK(pmEntries, "cargas");
-  const pmR = txPmR > 0 ? txPmR : sumK(pmEntries, "retiros");
+  // Use only panel_transactions — no fallback to manual entries
+  const cmC = txCmC;
+  const cmR = txCmR;
+  const pmC = txPmC;
+  const pmR = txPmR;
   const cmN = cmC - cmR;
   const pmN = pmC - pmR;
 
