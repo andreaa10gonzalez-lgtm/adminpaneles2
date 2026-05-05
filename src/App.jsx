@@ -2689,8 +2689,8 @@ const OwnerDashboard = ({ session, onLogout }) => {
       { id: "empleados_hist", label: "Empleados",   desc: "Historial por empleado" },
       { id: "liquidacion",    label: "Liquidación", desc: "Calculadora de sueldos" },
       { id: "creditos",       label: "Créditos OCR", desc: "Saldo y recargas de créditos" },
-      { id: "ajustes",        label: "Ajustes",     desc: "Configuración del panel" },
     ]},
+
     { id: "comms",        label: "Comunicaciones", icon: "◐", items: [
       { id: "comms_monitor",   label: "Monitor",    desc: "Estado en tiempo real por empleado" },
       { id: "comms_mensajes",  label: "Mensajes",   desc: "Mensajes y tiempos de respuesta" },
@@ -2846,6 +2846,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 fontSize:11, fontWeight:700, color:"#f59e0b",
                 transition:"all 150ms", whiteSpace:"nowrap" }}>
               ⚡ {creditos && creditos.plan !== "unlimited" ? `OCR (${creditos.creditos_disponibles})` : "OCR"}
+            </button>
+            <button onClick={() => setActiveTab("ajustes")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="ajustes" ? "rgba(100,116,139,0.2)" : "transparent",
+                border: activeTab==="ajustes" ? "1px solid #64748b" : "1px solid rgba(100,116,139,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="ajustes" ? "#f1f5f9" : "#64748b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              ⚙️ Ajustes
             </button>
           </div>
           {activeGroup && (
