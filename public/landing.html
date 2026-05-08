@@ -390,6 +390,25 @@
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--red); animation: blink 1.5s ease infinite; }
 </style>
+
+<!-- Facebook Pixel -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1288803373444685');
+fbq('track', 'PageView');
+</script>
+<noscript>
+<img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1288803373444685&ev=PageView&noscript=1"/>
+</noscript>
+<!-- End Facebook Pixel -->
 </head>
 <body>
 
@@ -407,7 +426,7 @@
   </div>
   <div class="nav-cta">
     <a href="https://adminpaneles2-2mys.vercel.app" target="_blank" class="btn btn-ghost">Ver panel demo</a>
-    <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+informaci%C3%B3n+sobre+Gestiona+tu+Panel" target="_blank" class="btn btn-primary">💬 Contactar</a>
+    <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+informaci%C3%B3n+sobre+Gestiona+tu+Panel" onclick="fbq('track', 'Lead')" target="_blank" class="btn btn-primary">💬 Contactar</a>
   </div>
 </nav>
 
@@ -654,26 +673,26 @@
       <!-- Badge -->
       <div style="flex-shrink:0;text-align:center">
         <div style="background:linear-gradient(135deg,#f59e0b,#f43f5e);border-radius:16px;padding:16px 24px;display:inline-block">
-          <div style="font-family:'Syne',sans-serif;font-size:42px;font-weight:800;color:white;line-height:1">50%</div>
-          <div style="font-size:13px;font-weight:700;color:white;letter-spacing:0.1em">OFF</div>
+          <div style="font-family:'Syne',sans-serif;font-size:42px;font-weight:800;color:white;line-height:1">7
+          <div style="font-size:18px;font-weight:700;color:white;letter-spacing:0.1em">DÍAS GRATIS</div>
         </div>
       </div>
 
       <!-- Text -->
       <div style="flex:1;min-width:200px;position:relative;z-index:1">
-        <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px">🔥 Oferta de lanzamiento</div>
+        <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px">🔥 Prueba sin costo</div>
         <div style="font-family:'Syne',sans-serif;font-size:clamp(20px,3vw,28px);font-weight:800;line-height:1.1;margin-bottom:10px">
-          Tu primer mes por <span style="color:#f59e0b">$50.000</span><br>
-          <span style="font-size:0.6em;color:var(--muted);text-decoration:line-through;font-weight:400">Precio normal $100.000</span>
+          Primeros 7 días <span style="color:#f59e0b">GRATIS</span><br>
+          <span style="font-size:0.6em;color:var(--muted);font-weight:400">Después $80.000/mes</span>
         </div>
         <div style="font-size:14px;color:var(--muted);line-height:1.5">Sin contratos · Sin letra chica · Cancelás cuando querés</div>
       </div>
 
       <!-- CTA -->
       <div style="flex-shrink:0;position:relative;z-index:1">
-        <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+aprovechar+el+50%25+OFF+del+primer+mes+de+Gestiona+tu+Panel" target="_blank"
+        <a href="https://adminpaneles2-2mys.vercel.app/registro.html" onclick="fbq('track', 'InitiateCheckout', {value: 80000, currency: 'ARS', content_name: 'Gestiona tu Panel'})" target="_blank"
           style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#25D366,#1ebe5d);color:white;padding:16px 28px;border-radius:14px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;text-decoration:none;transition:all 0.2s;box-shadow:0 8px 30px rgba(37,211,102,0.3)">
-          💬 Quiero el 50% OFF
+          💬 Empezar 7 días gratis
         </a>
         <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px">Respondemos en minutos</div>
       </div>
@@ -685,11 +704,11 @@
       <div class="popular-badge">ACCESO COMPLETO</div>
       <div class="price-name">Plan Mensual</div>
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
-        <div class="price-amount">$100.000</div>
+        <div class="price-amount">$80.000</div>
         <div style="font-size:15px;color:var(--muted);text-decoration:line-through">ARS</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
-        <span style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#f59e0b;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px">Primer mes $50.000</span>
+        <span style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#10b981;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px">7 días gratis para probar</span>
       </div>
       <ul class="price-features">
         <li>Panel completo de gestión</li>
@@ -703,8 +722,8 @@
         <li>Liquidación de sueldos</li>
         <li>Soporte por WhatsApp</li>
       </ul>
-      <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+contratar+Gestiona+tu+Panel+con+el+50%25+OFF+del+primer+mes" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:24px;font-size:15px;padding:14px">
-        Empezar ahora — $50.000 el 1er mes
+      <a href="https://adminpaneles2-2mys.vercel.app/registro.html" onclick="fbq('track', 'InitiateCheckout', {value: 80000, currency: 'ARS', content_name: 'Gestiona tu Panel'})" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:24px;font-size:15px;padding:14px">
+        🎯 Empezar gratis — 7 días sin costo
       </a>
     </div>
 
@@ -803,7 +822,7 @@
     <h2>¿Tu panel online ya<br>tiene control total?</h2>
     <p>Empezá hoy. Configuración en menos de 10 minutos.</p>
     <div class="cta-buttons">
-      <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+empezar+con+Gestiona+tu+Panel" target="_blank" class="btn btn-wa">
+      <a href="https://adminpaneles2-2mys.vercel.app/registro.html" onclick="fbq('track', 'InitiateCheckout', {value: 80000, currency: 'ARS', content_name: 'Gestiona tu Panel'})" target="_blank" class="btn btn-wa">
         💬 Hablar con nosotros
       </a>
       <a href="https://adminpaneles2-2mys.vercel.app" target="_blank" class="btn btn-ghost" style="font-size:15px;padding:14px 28px">

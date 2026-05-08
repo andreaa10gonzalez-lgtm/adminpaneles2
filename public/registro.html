@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crear cuenta — Gestiona tu Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Facebook Pixel -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}
+(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init','1288803373444685');
+fbq('track','PageView');
+</script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#06040f; color:#f1f5f9;
+    font-family:'DM Sans',sans-serif;
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .logo {
+    font-family:'Syne',sans-serif; font-size:20px; font-weight:800;
+    margin-bottom:32px; display:flex; align-items:center; gap:10px;
+  }
+  .logo-icon {
+    width:38px; height:38px; border-radius:10px;
+    background:linear-gradient(135deg,#7c3aed,#4f46e5);
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+  }
+  .card {
+    background:#0d0a1f; border:1px solid rgba(124,58,237,0.25);
+    border-radius:20px; padding:40px; width:100%; max-width:480px;
+    box-shadow:0 40px 100px rgba(124,58,237,0.12);
+  }
+  .card h1 {
+    font-family:'Syne',sans-serif; font-size:24px; font-weight:800;
+    margin-bottom:6px;
+  }
+  .card p { font-size:14px; color:#64748b; margin-bottom:28px; font-weight:300; }
+
+  .trial-badge {
+    background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);
+    border-radius:10px; padding:10px 14px; margin-bottom:24px;
+    display:flex; align-items:center; gap:10px; font-size:13px;
+  }
+
+  label {
+    display:block; font-size:12px; font-weight:600; color:#94a3b8;
+    text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;
+  }
+  input {
+    width:100%; background:#141028; border:1px solid rgba(124,58,237,0.2);
+    border-radius:10px; padding:12px 14px; color:#f1f5f9;
+    font-family:'DM Sans',sans-serif; font-size:14px;
+    margin-bottom:16px; outline:none; transition:border-color 0.2s;
+  }
+  input:focus { border-color:#7c3aed; }
+  input::placeholder { color:#475569; }
+
+  .error {
+    background:rgba(244,63,94,0.08); border:1px solid rgba(244,63,94,0.3);
+    border-radius:8px; padding:8px 12px; font-size:12px; color:#f43f5e;
+    margin-bottom:12px; display:none;
+  }
+
+  .btn-pay {
+    width:100%; padding:16px; border-radius:12px; border:none;
+    background:linear-gradient(135deg,#009ee3,#0070ba);
+    color:white; font-family:'DM Sans',sans-serif;
+    font-size:15px; font-weight:700; cursor:pointer;
+    transition:all 0.2s; display:flex; align-items:center;
+    justify-content:center; gap:10px; margin-top:8px;
+  }
+  .btn-pay:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,158,227,0.3); }
+  .btn-pay:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+
+  .divider {
+    display:flex; align-items:center; gap:12px; margin:20px 0;
+    color:#475569; font-size:12px;
+  }
+  .divider::before, .divider::after {
+    content:''; flex:1; height:1px; background:rgba(124,58,237,0.15);
+  }
+
+  .note { font-size:11px; color:#475569; text-align:center; margin-top:16px; line-height:1.5; }
+  .note a { color:#7c3aed; text-decoration:none; }
+
+  .step-indicator {
+    display:flex; gap:8px; margin-bottom:28px; justify-content:center;
+  }
+  .step-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:rgba(124,58,237,0.3);
+  }
+  .step-dot.active { background:#7c3aed; width:24px; border-radius:4px; }
+</style>
+</head>
+<body>
+
+<div class="logo">
+  <div class="logo-icon">🎰</div>
+  Gestiona tu Panel
+</div>
+
+<div class="card">
+  <div class="step-indicator">
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+
+  <h1>Crear tu cuenta</h1>
+  <p>Elegí tu usuario y contraseña para acceder al panel. Después de pagar, ya podés entrar.</p>
+
+  <div class="trial-badge">
+    <span style="font-size:18px">🎁</span>
+    <div>
+      <strong style="color:#10b981">7 días gratis</strong>
+      <span style="color:#64748b"> — después $80.000/mes. Cancelás cuando querés.</span>
+    </div>
+  </div>
+
+  <div id="error-msg" class="error"></div>
+
+  <label>Nombre de tu negocio</label>
+  <input type="text" id="nombre" placeholder="Ej: Casino Royal" maxlength="50" />
+
+  <label>Usuario</label>
+  <input type="text" id="usuario" placeholder="Ej: micanal123" maxlength="30"
+    oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')" />
+
+  <label>Contraseña</label>
+  <input type="password" id="pass" placeholder="Mínimo 6 caracteres" maxlength="30" />
+
+  <label>Repetir contraseña</label>
+  <input type="password" id="pass2" placeholder="Repetí tu contraseña" maxlength="30" />
+
+  <div class="divider">paso 1 de 2</div>
+
+  <button class="btn-pay" onclick="continuar()" id="btn-pay">
+    <img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__small@2x.png"
+      style="height:18px" alt="MP" />
+    Continuar al pago
+  </button>
+
+  <p class="note">
+    Al continuar aceptás los <a href="#">términos de uso</a>.<br>
+    ¿Ya tenés cuenta? <a href="https://adminpaneles2-2mys.vercel.app">Entrá acá</a>
+  </p>
+</div>
+
+<script>
+const SUPABASE_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwcWZ6c3JtbWFtZmh4eGFydnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMjk5NTUsImV4cCI6MjA5MDgwNTk1NX0.NIpHNhFDDqHR8AHgJiNvK1mxmHUTnqNMH6wbFvVNSNA";
+const MP_LINK = "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=f2c1f91a8bb5472dad784b735adfc537";
+
+async function continuar() {
+  const nombre = document.getElementById("nombre").value.trim();
+  const usuario = document.getElementById("usuario").value.trim();
+  const pass = document.getElementById("pass").value;
+  const pass2 = document.getElementById("pass2").value;
+  const errEl = document.getElementById("error-msg");
+  const btn = document.getElementById("btn-pay");
+
+  errEl.style.display = "none";
+
+  // Validations
+  if (!nombre) return showError("Ingresá el nombre de tu negocio");
+  if (usuario.length < 4) return showError("El usuario debe tener al menos 4 caracteres");
+  if (pass.length < 6) return showError("La contraseña debe tener al menos 6 caracteres");
+  if (pass !== pass2) return showError("Las contraseñas no coinciden");
+
+  btn.disabled = true;
+  btn.innerHTML = "⏳ Verificando...";
+
+  // Check if usuario already exists
+  const check = await fetch(`${SUPABASE_URL}/rest/v1/tenants?usuario=eq.${usuario}&select=id`, {
+    headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` }
+  });
+  const existing = await check.json();
+  if (existing.length > 0) {
+    btn.disabled = false;
+    btn.innerHTML = '<img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__small@2x.png" style="height:18px" alt="MP" /> Continuar al pago';
+    return showError("Ese usuario ya está en uso, elegí otro");
+  }
+
+  // Create tenant (inactive until payment confirmed)
+  const tenantId = "t_" + Date.now();
+  const vencimiento = new Date(Date.now() + 7 * 86400000).toISOString().slice(0,10);
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/tenants`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_ANON,
+      "Authorization": `Bearer ${SUPABASE_ANON}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal"
+    },
+    body: JSON.stringify({
+      id: tenantId,
+      nombre,
+      usuario,
+      pass,
+      fecha_vencimiento: vencimiento,
+      plan_activo: false, // activates when payment confirmed
+      plan_nombre: "pro"
+    })
+  });
+
+  if (!res.ok) {
+    btn.disabled = false;
+    btn.innerHTML = '<img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__small@2x.png" style="height:18px" alt="MP" /> Continuar al pago';
+    return showError("Error al crear la cuenta. Intentá de nuevo.");
+  }
+
+  // Track with Facebook Pixel
+  fbq('track', 'InitiateCheckout', {value: 80000, currency: 'ARS', content_name: 'Gestiona tu Panel'});
+
+  // Save credentials in sessionStorage so gracias.html can show them
+  sessionStorage.setItem("gtp_usuario", usuario);
+  sessionStorage.setItem("gtp_pass", pass);
+  sessionStorage.setItem("gtp_nombre", nombre);
+
+  // Redirect to MercadoPago with external_reference
+  window.location.href = MP_LINK + `&external_reference=${tenantId}`;
+}
+
+function showError(msg) {
+  const el = document.getElementById("error-msg");
+  el.textContent = msg;
+  el.style.display = "block";
+}
+</script>
+</body>
+</html>
