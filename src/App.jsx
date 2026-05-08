@@ -2863,6 +2863,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 transition:"all 150ms", whiteSpace:"nowrap" }}>
               ⚙️ Ajustes
             </button>
+            <button onClick={() => setActiveTab("ayuda")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="ayuda" ? "rgba(6,182,212,0.2)" : "transparent",
+                border: activeTab==="ayuda" ? "1px solid #06b6d4" : "1px solid rgba(6,182,212,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="ayuda" ? "#06b6d4" : "#64748b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              📖 Ayuda
+            </button>
           </div>
           {activeGroup && (
             <div style={{ display: "flex", alignItems: "center", gap: 2, paddingBottom: 4 }}>
@@ -4278,6 +4287,125 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 <div>Contactá al administrador para activar el análisis de imágenes.</div>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "ayuda" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#06b6d4,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📖</div>
+              <div>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#06b6d4" }}>Centro de ayuda</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Todo lo que necesitás para usar el panel</p>
+              </div>
+            </div>
+
+            {/* Downloads */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16, marginBottom:32 }}>
+              
+              <div style={{ background:"#0f0d1f", border:"1px solid rgba(124,58,237,0.3)", borderRadius:16, padding:24 }}>
+                <div style={{ fontSize:32, marginBottom:12 }}>🔌</div>
+                <div style={{ fontWeight:800, fontSize:16, marginBottom:6 }}>Extensión del navegador</div>
+                <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6, marginBottom:16 }}>
+                  Instalá la extensión en Chrome o Edge en cada PC de tus empleados para capturar movimientos y comprobantes automáticamente.
+                </div>
+                <a href="https://drive.google.com/uc?export=download&id=1U11qgzG4Blikmn3Xq15RqIRnpdNjI7Op" target="_blank"
+                  style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(124,58,237,0.15)", border:"1px solid rgba(124,58,237,0.4)", color:"#a78bfa", padding:"10px 18px", borderRadius:10, fontSize:13, fontWeight:700, textDecoration:"none" }}>
+                  ⬇️ Descargar ZIP
+                </a>
+              </div>
+
+              <div style={{ background:"#0f0d1f", border:"1px solid rgba(6,182,212,0.3)", borderRadius:16, padding:24 }}>
+                <div style={{ fontSize:32, marginBottom:12 }}>📄</div>
+                <div style={{ fontWeight:800, fontSize:16, marginBottom:6 }}>Manual completo</div>
+                <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6, marginBottom:16 }}>
+                  Guía completa de todas las funcionalidades del panel: caja, cruce de cargas, WhatsApp, IA y más.
+                </div>
+                <a href="https://adminpaneles2-2mys.vercel.app/manual_completo.pdf" target="_blank"
+                  style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(6,182,212,0.15)", border:"1px solid rgba(6,182,212,0.4)", color:"#06b6d4", padding:"10px 18px", borderRadius:10, fontSize:13, fontWeight:700, textDecoration:"none" }}>
+                  📖 Ver manual
+                </a>
+              </div>
+
+              <div style={{ background:"#0f0d1f", border:"1px solid rgba(37,211,102,0.3)", borderRadius:16, padding:24 }}>
+                <div style={{ fontSize:32, marginBottom:12 }}>💬</div>
+                <div style={{ fontWeight:800, fontSize:16, marginBottom:6 }}>Soporte por WhatsApp</div>
+                <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6, marginBottom:16 }}>
+                  ¿Tenés algún problema o consulta? Escribinos directamente y te respondemos a la brevedad.
+                </div>
+                <a href="https://wa.me/5492236339337?text=Hola%2C+necesito+ayuda+con+Gestiona+tu+Panel" target="_blank"
+                  style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(37,211,102,0.15)", border:"1px solid rgba(37,211,102,0.4)", color:"#25D366", padding:"10px 18px", borderRadius:10, fontSize:13, fontWeight:700, textDecoration:"none" }}>
+                  💬 Contactar soporte
+                </a>
+              </div>
+            </div>
+
+            {/* Instalacion extension */}
+            <div style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:24, marginBottom:24 }}>
+              <div style={{ fontWeight:800, fontSize:16, marginBottom:16, color:"#a78bfa" }}>🔌 Cómo instalar la extensión</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {[
+                  ["1", "Descargá el ZIP", "Hacé click en el botón de arriba y guardá el archivo en tu PC."],
+                  ["2", "Descomprimí el archivo", "Click derecho en el ZIP → Extraer aquí. Guardalo en una carpeta fija."],
+                  ["3", "Abrí la página de extensiones", "En Edge: edge://extensions — En Chrome: chrome://extensions"],
+                  ["4", "Activá el modo desarrollador", "Buscá el switch 'Modo de desarrollador' y activalo."],
+                  ["5", "Cargá la extensión", "Click en 'Cargar descomprimida' y seleccioná la carpeta extraída."],
+                  ["6", "Conectá al panel", "Click en el ícono de la extensión e ingresá tu usuario y el código de conexión."],
+                ].map(([num, title, desc]) => (
+                  <div key={num} style={{ display:"flex", gap:14, alignItems:"flex-start" }}>
+                    <div style={{ width:28, height:28, borderRadius:8, background:"rgba(124,58,237,0.2)", border:"1px solid rgba(124,58,237,0.4)", color:"#a78bfa", fontSize:12, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{num}</div>
+                    <div>
+                      <div style={{ fontWeight:700, fontSize:13, marginBottom:2 }}>{title}</div>
+                      <div style={{ fontSize:12, color:"#64748b" }}>{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Videos */}
+            <div style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:24, marginBottom:24 }}>
+              <div style={{ fontWeight:800, fontSize:16, marginBottom:16, color:"#a78bfa" }}>🎥 Videos tutoriales</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:16 }}>
+                {[
+                  ["syF355bFmkw", "Dashboard en tiempo real", "Cómo leer el resumen del negocio"],
+                  ["3TSM8PKZM1c", "Cruce de cargas", "Cómo detectar fraude automáticamente"],
+                  ["zPrM1cLAF6c", "Monitor WhatsApp", "Cómo monitorear a tus empleados"],
+                  ["cJjiVIYcxww", "IA Analista", "Cómo usar la inteligencia artificial"],
+                ].map(([id, title, desc]) => (
+                  <div key={id} style={{ borderRadius:12, overflow:"hidden", background:"#141028", border:"1px solid #1e1a38" }}>
+                    <div style={{ position:"relative", paddingBottom:"56.25%", height:0 }}>
+                      <iframe src={`https://www.youtube.com/embed/${id}`}
+                        style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
+                        allowFullScreen />
+                    </div>
+                    <div style={{ padding:"12px 14px" }}>
+                      <div style={{ fontWeight:700, fontSize:13, marginBottom:3 }}>{title}</div>
+                      <div style={{ fontSize:11, color:"#64748b" }}>{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* FAQ */}
+            <div style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:24 }}>
+              <div style={{ fontWeight:800, fontSize:16, marginBottom:16, color:"#a78bfa" }}>❓ Preguntas frecuentes</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+                {[
+                  ["¿La extensión lee mis mensajes personales?", "No. Solo captura mensajes mientras WhatsApp Web está abierto y solo guarda el contacto, hora y si fue entrante o saliente. No guarda contenido de mensajes personales."],
+                  ["¿Qué pasa si el empleado cierra el navegador?", "La captura se pausa hasta que lo vuelve a abrir. No se pierde ningún dato ya capturado."],
+                  ["¿El panel funciona en el celular?", "Sí, es responsive y funciona en celular. La extensión solo funciona en Chrome o Edge de escritorio."],
+                  ["¿Con qué frecuencia se actualizan los datos?", "Los datos de WhatsApp se actualizan cada 30 segundos. Los movimientos se capturan en tiempo real mientras el empleado tiene el panel del casino abierto."],
+                  ["¿Cómo renuevo el plan mensual?", "El cobro es automático por MercadoPago. Si tenés algún problema escribinos al WhatsApp de soporte."],
+                ].map(([q, a], i) => (
+                  <div key={i} style={{ borderBottom:"1px solid #1e1a38", padding:"14px 0" }}>
+                    <div style={{ fontWeight:700, fontSize:13, color:"#a78bfa", marginBottom:5 }}>P: {q}</div>
+                    <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6 }}>R: {a}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
