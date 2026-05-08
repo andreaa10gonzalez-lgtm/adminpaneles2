@@ -1006,8 +1006,15 @@ const Movimientos = ({ tid, supabase, fmt }) => {
       query = query.eq("fecha", fechaDesde);
     }
 
-    const { data } = await query.limit(2000);
-    let result = data || [];
+    // Paginate to get all results without limit
+    let result = [], from = 0, chunk = 1000;
+    while (true) {
+      const { data: chunk_data, error } = await query.range(from, from + chunk - 1);
+      if (error || !chunk_data?.length) break;
+      result = result.concat(chunk_data);
+      if (chunk_data.length < chunk) break;
+      from += chunk;
+    }
 
     // Filter by time range if set
     if (horaDesde || horaHasta) {
