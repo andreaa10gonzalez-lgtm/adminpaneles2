@@ -1626,6 +1626,376 @@ const CargasIA = ({ tid, supabase, fmt }) => {
   );
 };
 
+const AyudaManual = ({ setActiveTab }) => {
+  const [seccion, setSeccion] = useState("inicio");
+
+  const SECCIONES = [
+    { id:"inicio",      icon:"🏠", label:"Inicio",           color:"#a78bfa" },
+    { id:"extension",   icon:"🔌", label:"La extensión",     color:"#06b6d4" },
+    { id:"dashboard",   icon:"📊", label:"Dashboard",        color:"#10b981" },
+    { id:"caja",        icon:"💰", label:"Caja",             color:"#f59e0b" },
+    { id:"cruce",       icon:"🔍", label:"Cruce de Cargas",  color:"#f43f5e" },
+    { id:"movimientos", icon:"📋", label:"Movimientos",      color:"#a78bfa" },
+    { id:"jugadores",   icon:"👥", label:"Jugadores",        color:"#10b981" },
+    { id:"whatsapp",    icon:"💬", label:"WhatsApp",         color:"#25D366" },
+    { id:"ia",          icon:"🤖", label:"IA Analista",      color:"#7c3aed" },
+    { id:"ocr",         icon:"⚡", label:"OCR Comprobantes", color:"#f59e0b" },
+    { id:"ajustes_h",   icon:"⚙️", label:"Ajustes",          color:"#64748b" },
+    { id:"faq",         icon:"❓", label:"Preguntas frecuentes", color:"#94a3b8" },
+  ];
+
+  const Btn = ({ tab, label }) => (
+    <button onClick={() => setActiveTab(tab)}
+      style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(124,58,237,0.15)",
+        border:"1px solid rgba(124,58,237,0.3)", color:"#a78bfa", padding:"6px 12px",
+        borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer", textDecoration:"none" }}>
+      → Ir a {label}
+    </button>
+  );
+
+  const renderContenido = () => {
+    switch(seccion) {
+      case "inicio": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#06b6d4" }}>Bienvenido a Gestiona tu Panel</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Gestiona tu Panel es tu herramienta de control total para paneles online. Detecta cargas, cruza comprobantes de WhatsApp, monitorea a tus empleados y te avisa si algo está mal — todo automáticamente.
+          </p>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:24 }}>
+            {[
+              ["🔌","Instalar la extensión","El primer paso. Sin la extensión no hay captura de datos.","extension"],
+              ["📊","Ver el Dashboard","Tu resumen del negocio en tiempo real.","dashboard"],
+              ["🔍","Cruce de Cargas","La herramienta anti-fraude más importante.","cruce"],
+              ["💬","Monitor WhatsApp","Controlá que tus empleados atiendan bien.","whatsapp"],
+            ].map(([icon,title,desc,id]) => (
+              <div key={id} onClick={() => setSeccion(id)}
+                style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:16,cursor:"pointer",transition:"border-color 0.2s" }}
+                onMouseOver={e=>e.currentTarget.style.borderColor="#7c3aed"}
+                onMouseOut={e=>e.currentTarget.style.borderColor="#1e1a38"}>
+                <div style={{ fontSize:24,marginBottom:8 }}>{icon}</div>
+                <div style={{ fontWeight:700,fontSize:14,marginBottom:4 }}>{title}</div>
+                <div style={{ fontSize:12,color:"#64748b" }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:"#0f0d1f",border:"1px solid rgba(37,211,102,0.3)",borderRadius:12,padding:16,display:"flex",alignItems:"center",gap:12 }}>
+            <span style={{ fontSize:24 }}>💬</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700,fontSize:14,marginBottom:3 }}>¿Necesitás ayuda?</div>
+              <div style={{ fontSize:12,color:"#64748b" }}>Contactanos por WhatsApp y te respondemos a la brevedad.</div>
+            </div>
+            <a href="https://wa.me/5492236339337?text=Hola%2C+necesito+ayuda+con+Gestiona+tu+Panel" target="_blank"
+              style={{ background:"#25D366",color:"white",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap" }}>
+              💬 Soporte
+            </a>
+          </div>
+        </div>
+      );
+
+      case "extension": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#06b6d4" }}>🔌 La extensión del navegador</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            La extensión es un complemento que instalás en Chrome o Edge en la PC de cada empleado. Funciona en segundo plano y captura automáticamente los movimientos del panel del casino y los mensajes de WhatsApp.
+          </p>
+          <div style={{ background:"#0f0d1f",border:"1px solid rgba(124,58,237,0.3)",borderRadius:12,padding:16,marginBottom:20 }}>
+            <div style={{ fontWeight:700,fontSize:14,marginBottom:12,color:"#a78bfa" }}>Qué captura la extensión</div>
+            {["Transacciones del casino: cargas y retiros con jugador, monto y horario","Mensajes de WhatsApp Web: entrantes de clientes y salientes del empleado","Imágenes de comprobantes para análisis con IA","Tiempo de respuesta de cada empleado","Chats sin respuesta para generar alertas"].map((item,i) => (
+              <div key={i} style={{ display:"flex",gap:8,marginBottom:6,fontSize:13,color:"#94a3b8" }}>
+                <span style={{ color:"#10b981",flexShrink:0 }}>✓</span>{item}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:700,fontSize:15,marginBottom:12 }}>Instalación paso a paso</div>
+          {[
+            ["1","Descargá el ZIP","Hacé click en el botón de abajo y guardá el archivo."],
+            ["2","Descomprimí","Click derecho en el ZIP → Extraer aquí. Guardalo en una carpeta fija, no la muevas después."],
+            ["3","Abrí extensiones","En Edge: edge://extensions — En Chrome: chrome://extensions"],
+            ["4","Modo desarrollador","Activá el switch 'Modo de desarrollador'."],
+            ["5","Cargar extensión","Click en 'Cargar descomprimida' y seleccioná la carpeta extraída."],
+            ["6","Conectar","Click en el ícono naranja de la extensión, ingresá tu usuario y contraseña del panel."],
+          ].map(([num,title,desc]) => (
+            <div key={num} style={{ display:"flex",gap:12,marginBottom:12,alignItems:"flex-start" }}>
+              <div style={{ width:28,height:28,borderRadius:8,background:"rgba(6,182,212,0.15)",border:"1px solid rgba(6,182,212,0.3)",color:"#06b6d4",fontSize:12,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>{num}</div>
+              <div><div style={{ fontWeight:700,fontSize:13,marginBottom:2 }}>{title}</div><div style={{ fontSize:12,color:"#64748b" }}>{desc}</div></div>
+            </div>
+          ))}
+          <a href="https://drive.google.com/file/d/1U11qgzG4Blikmn3Xq15RqIRnpdNjI7Op/view?usp=sharing" target="_blank"
+            style={{ display:"inline-flex",alignItems:"center",gap:8,background:"rgba(6,182,212,0.15)",border:"1px solid rgba(6,182,212,0.4)",color:"#06b6d4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:700,textDecoration:"none",marginTop:8 }}>
+            ⬇️ Descargar extensión ZIP
+          </a>
+        </div>
+      );
+
+      case "dashboard": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#10b981" }}>📊 Dashboard</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>El Dashboard es tu pantalla principal. Muestra el resumen del mes con comparativa automática contra el mes anterior.</p>
+          <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:20 }}>
+            {[
+              ["Cargas del mes","Total de dinero ingresado este mes","verde"],
+              ["Retiros del mes","Total retirado","rojo"],
+              ["Neto del mes","Cargas menos retiros — tu ganancia bruta","violeta"],
+              ["Jugadores nuevos","Nuevos jugadores registrados este mes","naranja"],
+              ["Jugadores activos","Total con actividad este mes","cyan"],
+              ["Alertas de caja","Diferencias detectadas en cajas","amarillo"],
+            ].map(([k,v]) => (
+              <div key={k} style={{ display:"flex",gap:12,padding:"10px 14px",background:"#0f0d1f",borderRadius:10,border:"1px solid #1e1a38",fontSize:13 }}>
+                <span style={{ fontWeight:700,minWidth:140 }}>{k}</span>
+                <span style={{ color:"#64748b" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",marginBottom:16 }}>
+            💡 La comparativa es proporcional: si hoy es día 15, compara los primeros 15 días de este mes con los primeros 15 días del mes anterior.
+          </div>
+          <Btn tab="resumen" label="Dashboard" />
+        </div>
+      );
+
+      case "caja": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#f59e0b" }}>💰 Caja</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Registrá la apertura y cierre de cada turno. El panel calcula automáticamente si hay sobrante o faltante.
+          </p>
+          {[
+            ["Cargar turno","Seleccionás la fecha y el empleado. Ingresás los montos de apertura (MercadoPago, efectivo, etc.) y los de cierre al final del turno."],
+            ["Cálculo automático","El panel suma las cargas y retiros del turno y calcula el neto esperado. Lo compara con el cierre real."],
+            ["Diferencias","Si hay faltante (rojo) o sobrante (verde) aparece en el historial y en las alertas del Dashboard."],
+          ].map(([t,d],i) => (
+            <div key={i} style={{ display:"flex",gap:12,marginBottom:12 }}>
+              <div style={{ width:8,borderRadius:4,background:"rgba(245,158,11,0.4)",flexShrink:0 }}></div>
+              <div><div style={{ fontWeight:700,fontSize:13,marginBottom:3 }}>{t}</div><div style={{ fontSize:13,color:"#64748b",lineHeight:1.6 }}>{d}</div></div>
+            </div>
+          ))}
+          <div style={{ display:"flex",gap:8,marginTop:8 }}>
+            <Btn tab="caja" label="Caja" />
+          </div>
+        </div>
+      );
+
+      case "cruce": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#f43f5e" }}>🔍 Cruce de Cargas</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            La herramienta anti-fraude más importante. Cruza cada transacción del casino con los comprobantes de pago detectados en WhatsApp.
+          </p>
+          <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:20 }}>
+            {[
+              ["✅ Verificada · OCR nombre+monto","Hay comprobante del mismo jugador con monto similar en horario cercano. Sin acción requerida.","rgba(16,185,129,0.08)","rgba(16,185,129,0.3)"],
+              ["✅ Verificada · OCR solo monto","Hay comprobante con monto similar pero el nombre no coincide exactamente. Verificar manualmente.","rgba(16,185,129,0.05)","rgba(16,185,129,0.2)"],
+              ["✅ Verificada · nombre+hora","El empleado confirmó la carga por mensaje y el nombre coincide.","rgba(16,185,129,0.05)","rgba(16,185,129,0.15)"],
+              ["⚠️ Sospechosa","Hay una transacción en el panel pero NO hay comprobante de pago. INVESTIGAR — posible fraude.","rgba(244,63,94,0.08)","rgba(244,63,94,0.4)"],
+              ["⏳ Pendiente","Hay comprobante en WhatsApp pero la transacción aún no apareció. Esperá o verificá.","rgba(245,158,11,0.08)","rgba(245,158,11,0.3)"],
+            ].map(([estado,desc,bg,border]) => (
+              <div key={estado} style={{ background:bg,border:`1px solid ${border}`,borderRadius:10,padding:"12px 14px" }}>
+                <div style={{ fontWeight:700,fontSize:13,marginBottom:4 }}>{estado}</div>
+                <div style={{ fontSize:12,color:"#94a3b8" }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",marginBottom:16 }}>
+            🚨 <strong style={{ color:"#f43f5e" }}>Carga sospechosa:</strong> alguien cargó fichas sin haber recibido dinero del cliente. Investigá inmediatamente con el empleado del turno.
+          </div>
+          <Btn tab="cruce" label="Cruce de Cargas" />
+        </div>
+      );
+
+      case "movimientos": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#a78bfa" }}>📋 Movimientos</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Todas las transacciones capturadas por la extensión. Podés filtrar por fecha, rango y horario.
+          </p>
+          {["Filtro por día o rango de fechas (toda la semana, el mes completo, etc.)","Filtro por horario: solo el turno de la tarde de 16:00 a 00:00","Filtro por tipo: Cargas, Retiros o Todos","Totales automáticos del período filtrado"].map((item,i) => (
+            <div key={i} style={{ display:"flex",gap:8,marginBottom:8,fontSize:13,color:"#94a3b8" }}>
+              <span style={{ color:"#a78bfa",flexShrink:0 }}>→</span>{item}
+            </div>
+          ))}
+          <div style={{ background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",margin:"16px 0" }}>
+            💡 Los movimientos solo aparecen si la extensión está instalada y el empleado tiene el panel del casino abierto mientras trabaja.
+          </div>
+          <Btn tab="movimientos" label="Movimientos" />
+        </div>
+      );
+
+      case "jugadores": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#10b981" }}>👥 Jugadores</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>Analizá tu base de jugadores para tomar mejores decisiones de negocio.</p>
+          <div style={{ display:"flex",flexDirection:"column",gap:6,marginBottom:20 }}>
+            {[
+              ["Ranking","Top 20 jugadores del mes por volumen. Identificá tus mejores clientes.","ranking"],
+              ["Inactivos","Jugadores sin actividad en 15+ días. Candidatos para recuperar.","inactivos"],
+              ["Horarios Pico","A qué hora conviene tener más operadores disponibles.","horarios"],
+              ["Contactos","Base con username + número de WhatsApp.","contactos"],
+              ["Recuperación","Lista de inactivos por prioridad con exportación CSV.","recuperacion"],
+            ].map(([t,d,tab]) => (
+              <div key={tab} style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:10,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12 }}>
+                <div>
+                  <div style={{ fontWeight:700,fontSize:13,marginBottom:2 }}>{t}</div>
+                  <div style={{ fontSize:12,color:"#64748b" }}>{d}</div>
+                </div>
+                <Btn tab={tab} label={t} />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      case "whatsapp": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#25D366" }}>💬 Monitor WhatsApp</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Controlá en tiempo real que tus empleados atiendan bien a los clientes.
+          </p>
+          {[
+            ["🔴 Alerta roja","Cliente esperando más de 5 minutos sin respuesta — acción requerida"],
+            ["🟢 Verde","Todos los clientes atendidos"],
+            ["⏱ Tiempo de respuesta","Medí el promedio de cada empleado por turno"],
+            ["📋 Cargas IA","Comprobantes detectados automáticamente por OCR con monto, banco y titular"],
+          ].map(([k,v],i) => (
+            <div key={i} style={{ display:"flex",gap:10,padding:"10px 14px",background:"#0f0d1f",borderRadius:10,border:"1px solid #1e1a38",fontSize:13,marginBottom:6 }}>
+              <span style={{ fontWeight:700,minWidth:160 }}>{k}</span>
+              <span style={{ color:"#64748b" }}>{v}</span>
+            </div>
+          ))}
+          <div style={{ display:"flex",gap:8,marginTop:16,flexWrap:"wrap" }}>
+            <Btn tab="comms_monitor" label="Monitor" />
+            <Btn tab="cargas_ia" label="Cargas IA" />
+            <Btn tab="rendimiento" label="Rendimiento" />
+          </div>
+        </div>
+      );
+
+      case "ia": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#7c3aed" }}>🤖 IA Analista</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Tu analista de negocios disponible 24/7. Tiene acceso a todos tus datos y podés preguntarle cualquier cosa.
+          </p>
+          <div style={{ fontWeight:700,fontSize:14,marginBottom:10 }}>Ejemplos de preguntas:</div>
+          <div style={{ display:"flex",flexDirection:"column",gap:6,marginBottom:20 }}>
+            {[
+              "¿Cómo viene el mes comparado con el anterior?",
+              "¿Hay algo sospechoso en las cargas de hoy?",
+              "¿Cuáles fueron los mejores días de esta semana?",
+              "¿Qué jugadores están en riesgo de abandono?",
+              "¿Cuál es el empleado con mejor tiempo de respuesta?",
+              "¿A qué hora conviene tener más operadores?",
+            ].map((q,i) => (
+              <div key={i} style={{ background:"#0f0d1f",border:"1px solid rgba(124,58,237,0.2)",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#94a3b8" }}>
+                💬 "{q}"
+              </div>
+            ))}
+          </div>
+          <Btn tab="ia" label="IA Analista" />
+        </div>
+      );
+
+      case "ocr": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#f59e0b" }}>⚡ OCR — Análisis de comprobantes</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            La extensión detecta automáticamente cuando un cliente manda una imagen de comprobante por WhatsApp y la analiza con IA para extraer el monto, banco y titular.
+          </p>
+          {[
+            ["1","Cliente manda comprobante","El cliente envía una foto del comprobante por WhatsApp."],
+            ["2","Extensión detecta la imagen","La extensión la captura automáticamente sin que el empleado haga nada."],
+            ["3","IA analiza el comprobante","Extrae: monto, banco, titular, tipo de operación y nivel de confianza."],
+            ["4","Se registra en el panel","Aparece en Comunicaciones → Cargas IA y se usa para el Cruce de Cargas."],
+          ].map(([num,t,d]) => (
+            <div key={num} style={{ display:"flex",gap:12,marginBottom:12 }}>
+              <div style={{ width:28,height:28,borderRadius:8,background:"rgba(245,158,11,0.15)",border:"1px solid rgba(245,158,11,0.3)",color:"#f59e0b",fontSize:12,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>{num}</div>
+              <div><div style={{ fontWeight:700,fontSize:13,marginBottom:2 }}>{t}</div><div style={{ fontSize:12,color:"#64748b" }}>{d}</div></div>
+            </div>
+          ))}
+          <div style={{ background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",margin:"16px 0" }}>
+            💡 Los créditos OCR son opcionales. Sin ellos el panel funciona completo, simplemente no analiza imágenes automáticamente. Contactá soporte para activarlos.
+          </div>
+          <Btn tab="creditos" label="Créditos OCR" />
+        </div>
+      );
+
+      case "ajustes_h": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#64748b" }}>⚙️ Ajustes</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>Configurá tu panel, empleados y billeteras.</p>
+          {[
+            ["Empleados","Agregá o desactivá empleados. Cada uno tiene su turno y su código de conexión para la extensión."],
+            ["Billeteras","Registrá las cuentas y alias donde recibís los pagos."],
+            ["Sueldos","Configurá el sueldo base por turno para el cálculo automático de liquidación."],
+            ["Plan","Información de tu plan activo y fecha de vencimiento."],
+          ].map(([t,d],i) => (
+            <div key={i} style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:10,padding:"12px 14px",marginBottom:8 }}>
+              <div style={{ fontWeight:700,fontSize:13,marginBottom:3 }}>{t}</div>
+              <div style={{ fontSize:12,color:"#64748b" }}>{d}</div>
+            </div>
+          ))}
+          <Btn tab="ajustes" label="Ajustes" />
+        </div>
+      );
+
+      case "faq": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:16,color:"#94a3b8" }}>❓ Preguntas frecuentes</h2>
+          <div style={{ display:"flex",flexDirection:"column",gap:0 }}>
+            {[
+              ["¿La extensión lee mis mensajes personales?","No. Solo guarda el contacto, la hora y si fue entrante o saliente. No guarda el contenido de mensajes personales."],
+              ["¿Qué pasa si el empleado cierra el navegador?","La captura se pausa hasta que lo vuelve a abrir. No se pierde ningún dato ya capturado."],
+              ["¿El panel funciona en el celular?","Sí, es responsive. La extensión solo funciona en Chrome o Edge de escritorio."],
+              ["¿Con qué frecuencia se actualizan los datos?","WhatsApp cada 30 segundos. Movimientos en tiempo real mientras el empleado tiene el panel del casino abierto."],
+              ["¿Cómo agrego un nuevo empleado?","Ajustes → Empleados → Agregar. El sistema genera el código de conexión para la extensión."],
+              ["¿Qué hago si veo una carga sospechosa?","Comunicarte con el empleado del turno y verificar si el cliente pagó. Si no hay comprobante y el empleado no puede justificarlo, es fraude."],
+              ["¿Cómo renuevo el plan?","El cobro es automático por MercadoPago. Si cancelás o hay un problema escribinos al WhatsApp de soporte."],
+            ].map(([q,a],i) => (
+              <div key={i} style={{ borderBottom:"1px solid #1e1a38",padding:"14px 0" }}>
+                <div style={{ fontWeight:700,fontSize:13,color:"#a78bfa",marginBottom:5 }}>P: {q}</div>
+                <div style={{ fontSize:13,color:"#64748b",lineHeight:1.6 }}>R: {a}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      default: return null;
+    }
+  };
+
+  return (
+    <div style={{ display:"flex", gap:24, alignItems:"flex-start" }}>
+      {/* Sidebar */}
+      <div style={{ width:200, flexShrink:0, background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:12, position:"sticky", top:80 }}>
+        <div style={{ fontSize:11,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10,padding:"0 4px" }}>Manual</div>
+        {SECCIONES.map(s => (
+          <button key={s.id} onClick={() => setSeccion(s.id)}
+            style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"8px 10px", borderRadius:8,
+              background: seccion===s.id ? "rgba(124,58,237,0.15)" : "transparent",
+              border: seccion===s.id ? "1px solid rgba(124,58,237,0.3)" : "1px solid transparent",
+              cursor:"pointer", fontSize:13, fontWeight: seccion===s.id ? 700 : 500,
+              color: seccion===s.id ? s.color : "#64748b", textAlign:"left", marginBottom:2 }}>
+            <span>{s.icon}</span> {s.label}
+          </button>
+        ))}
+        <div style={{ borderTop:"1px solid #1e1a38", marginTop:12, paddingTop:12 }}>
+          <a href="https://wa.me/5492236339337?text=Hola%2C+necesito+ayuda" target="_blank"
+            style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,
+              background:"rgba(37,211,102,0.1)",border:"1px solid rgba(37,211,102,0.25)",
+              color:"#25D366",fontSize:12,fontWeight:700,textDecoration:"none" }}>
+            💬 Soporte WhatsApp
+          </a>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex:1, minWidth:0 }}>
+        {renderContenido()}
+      </div>
+    </div>
+  );
+};
+
 const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
   const [mensajesWA, setMensajesWA] = useState([]);
   const [ocrResultados, setOcrResultados] = useState([]);
@@ -4291,122 +4661,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
         )}
 
         {activeTab === "ayuda" && (
-          <div>
-            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
-              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#06b6d4,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📖</div>
-              <div>
-                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#06b6d4" }}>Centro de ayuda</h2>
-                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Todo lo que necesitás para usar el panel</p>
-              </div>
-            </div>
-
-            {/* Downloads */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16, marginBottom:32 }}>
-              
-              <div style={{ background:"#0f0d1f", border:"1px solid rgba(124,58,237,0.3)", borderRadius:16, padding:24 }}>
-                <div style={{ fontSize:32, marginBottom:12 }}>🔌</div>
-                <div style={{ fontWeight:800, fontSize:16, marginBottom:6 }}>Extensión del navegador</div>
-                <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6, marginBottom:16 }}>
-                  Instalá la extensión en Chrome o Edge en cada PC de tus empleados para capturar movimientos y comprobantes automáticamente.
-                </div>
-                <a href="https://drive.google.com/uc?export=download&id=1U11qgzG4Blikmn3Xq15RqIRnpdNjI7Op" target="_blank"
-                  style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(124,58,237,0.15)", border:"1px solid rgba(124,58,237,0.4)", color:"#a78bfa", padding:"10px 18px", borderRadius:10, fontSize:13, fontWeight:700, textDecoration:"none" }}>
-                  ⬇️ Descargar ZIP
-                </a>
-              </div>
-
-              <div style={{ background:"#0f0d1f", border:"1px solid rgba(6,182,212,0.3)", borderRadius:16, padding:24 }}>
-                <div style={{ fontSize:32, marginBottom:12 }}>📄</div>
-                <div style={{ fontWeight:800, fontSize:16, marginBottom:6 }}>Manual completo</div>
-                <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6, marginBottom:16 }}>
-                  Guía completa de todas las funcionalidades del panel: caja, cruce de cargas, WhatsApp, IA y más.
-                </div>
-                <a href="https://adminpaneles2-2mys.vercel.app/manual_completo.pdf" target="_blank"
-                  style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(6,182,212,0.15)", border:"1px solid rgba(6,182,212,0.4)", color:"#06b6d4", padding:"10px 18px", borderRadius:10, fontSize:13, fontWeight:700, textDecoration:"none" }}>
-                  📖 Ver manual
-                </a>
-              </div>
-
-              <div style={{ background:"#0f0d1f", border:"1px solid rgba(37,211,102,0.3)", borderRadius:16, padding:24 }}>
-                <div style={{ fontSize:32, marginBottom:12 }}>💬</div>
-                <div style={{ fontWeight:800, fontSize:16, marginBottom:6 }}>Soporte por WhatsApp</div>
-                <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6, marginBottom:16 }}>
-                  ¿Tenés algún problema o consulta? Escribinos directamente y te respondemos a la brevedad.
-                </div>
-                <a href="https://wa.me/5492236339337?text=Hola%2C+necesito+ayuda+con+Gestiona+tu+Panel" target="_blank"
-                  style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(37,211,102,0.15)", border:"1px solid rgba(37,211,102,0.4)", color:"#25D366", padding:"10px 18px", borderRadius:10, fontSize:13, fontWeight:700, textDecoration:"none" }}>
-                  💬 Contactar soporte
-                </a>
-              </div>
-            </div>
-
-            {/* Instalacion extension */}
-            <div style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:24, marginBottom:24 }}>
-              <div style={{ fontWeight:800, fontSize:16, marginBottom:16, color:"#a78bfa" }}>🔌 Cómo instalar la extensión</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {[
-                  ["1", "Descargá el ZIP", "Hacé click en el botón de arriba y guardá el archivo en tu PC."],
-                  ["2", "Descomprimí el archivo", "Click derecho en el ZIP → Extraer aquí. Guardalo en una carpeta fija."],
-                  ["3", "Abrí la página de extensiones", "En Edge: edge://extensions — En Chrome: chrome://extensions"],
-                  ["4", "Activá el modo desarrollador", "Buscá el switch 'Modo de desarrollador' y activalo."],
-                  ["5", "Cargá la extensión", "Click en 'Cargar descomprimida' y seleccioná la carpeta extraída."],
-                  ["6", "Conectá al panel", "Click en el ícono de la extensión e ingresá tu usuario y el código de conexión."],
-                ].map(([num, title, desc]) => (
-                  <div key={num} style={{ display:"flex", gap:14, alignItems:"flex-start" }}>
-                    <div style={{ width:28, height:28, borderRadius:8, background:"rgba(124,58,237,0.2)", border:"1px solid rgba(124,58,237,0.4)", color:"#a78bfa", fontSize:12, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{num}</div>
-                    <div>
-                      <div style={{ fontWeight:700, fontSize:13, marginBottom:2 }}>{title}</div>
-                      <div style={{ fontSize:12, color:"#64748b" }}>{desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Videos */}
-            <div style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:24, marginBottom:24 }}>
-              <div style={{ fontWeight:800, fontSize:16, marginBottom:16, color:"#a78bfa" }}>🎥 Videos tutoriales</div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:16 }}>
-                {[
-                  ["syF355bFmkw", "Dashboard en tiempo real", "Cómo leer el resumen del negocio"],
-                  ["3TSM8PKZM1c", "Cruce de cargas", "Cómo detectar fraude automáticamente"],
-                  ["zPrM1cLAF6c", "Monitor WhatsApp", "Cómo monitorear a tus empleados"],
-                  ["cJjiVIYcxww", "IA Analista", "Cómo usar la inteligencia artificial"],
-                ].map(([id, title, desc]) => (
-                  <div key={id} style={{ borderRadius:12, overflow:"hidden", background:"#141028", border:"1px solid #1e1a38" }}>
-                    <div style={{ position:"relative", paddingBottom:"56.25%", height:0 }}>
-                      <iframe src={`https://www.youtube.com/embed/${id}`}
-                        style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", border:"none" }}
-                        allowFullScreen />
-                    </div>
-                    <div style={{ padding:"12px 14px" }}>
-                      <div style={{ fontWeight:700, fontSize:13, marginBottom:3 }}>{title}</div>
-                      <div style={{ fontSize:11, color:"#64748b" }}>{desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* FAQ */}
-            <div style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:24 }}>
-              <div style={{ fontWeight:800, fontSize:16, marginBottom:16, color:"#a78bfa" }}>❓ Preguntas frecuentes</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
-                {[
-                  ["¿La extensión lee mis mensajes personales?", "No. Solo captura mensajes mientras WhatsApp Web está abierto y solo guarda el contacto, hora y si fue entrante o saliente. No guarda contenido de mensajes personales."],
-                  ["¿Qué pasa si el empleado cierra el navegador?", "La captura se pausa hasta que lo vuelve a abrir. No se pierde ningún dato ya capturado."],
-                  ["¿El panel funciona en el celular?", "Sí, es responsive y funciona en celular. La extensión solo funciona en Chrome o Edge de escritorio."],
-                  ["¿Con qué frecuencia se actualizan los datos?", "Los datos de WhatsApp se actualizan cada 30 segundos. Los movimientos se capturan en tiempo real mientras el empleado tiene el panel del casino abierto."],
-                  ["¿Cómo renuevo el plan mensual?", "El cobro es automático por MercadoPago. Si tenés algún problema escribinos al WhatsApp de soporte."],
-                ].map(([q, a], i) => (
-                  <div key={i} style={{ borderBottom:"1px solid #1e1a38", padding:"14px 0" }}>
-                    <div style={{ fontWeight:700, fontSize:13, color:"#a78bfa", marginBottom:5 }}>P: {q}</div>
-                    <div style={{ fontSize:13, color:"#64748b", lineHeight:1.6 }}>R: {a}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <AyudaManual setActiveTab={setActiveTab} />
         )}
 
         {activeTab === "ajustes" && (
