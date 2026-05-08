@@ -143,7 +143,8 @@ fbq('track','PageView');
   <div class="divider">paso 1 de 2</div>
 
   <button class="btn-pay" onclick="continuar()" id="btn-pay">
-    💳
+    <img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__small@2x.png"
+      style="height:18px" alt="MP" />
     Continuar al pago
   </button>
 
@@ -156,7 +157,7 @@ fbq('track','PageView');
 <script>
 const SUPABASE_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwcWZ6c3JtbWFtZmh4eGFydnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMjk5NTUsImV4cCI6MjA5MDgwNTk1NX0.NIpHNhFDDqHR8AHgJiNvK1mxmHUTnqNMH6wbFvVNSNA";
-const MP_LINK = "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=f29afb9fab59414c9da5da73a3e36f3d";
+const MP_LINK = "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=f2c1f91a8bb5472dad784b735adfc537";
 
 async function continuar() {
   const nombre = document.getElementById("nombre").value.trim();
