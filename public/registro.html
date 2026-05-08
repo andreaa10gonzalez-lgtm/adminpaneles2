@@ -143,8 +143,7 @@ fbq('track','PageView');
   <div class="divider">paso 1 de 2</div>
 
   <button class="btn-pay" onclick="continuar()" id="btn-pay">
-    <img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__small@2x.png"
-      style="height:18px" alt="MP" />
+    💳
     Continuar al pago
   </button>
 
@@ -155,21 +154,18 @@ fbq('track','PageView');
 </div>
 
 <script>
-const SUPABASE_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwcWZ6c3JtbWFtZmh4eGFydnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMjk5NTUsImV4cCI6MjA5MDgwNTk1NX0.NIpHNhFDDqHR8AHgJiNvK1mxmHUTnqNMH6wbFvVNSNA";
-const MP_LINK = "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=f2c1f91a8bb5472dad784b735adfc537";
+const EDGE_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co/functions/v1/registro-tenant";
+const MP_LINK = "https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id=f29afb9fab59414c9da5da73a3e36f3d";
 
 async function continuar() {
   const nombre = document.getElementById("nombre").value.trim();
   const usuario = document.getElementById("usuario").value.trim();
   const pass = document.getElementById("pass").value;
   const pass2 = document.getElementById("pass2").value;
-  const errEl = document.getElementById("error-msg");
   const btn = document.getElementById("btn-pay");
 
-  errEl.style.display = "none";
+  document.getElementById("error-msg").style.display = "none";
 
-  // Validations
   if (!nombre) return showError("Ingresá el nombre de tu negocio");
   if (usuario.length < 4) return showError("El usuario debe tener al menos 4 caracteres");
   if (pass.length < 6) return showError("La contraseña debe tener al menos 6 caracteres");
@@ -178,56 +174,29 @@ async function continuar() {
   btn.disabled = true;
   btn.innerHTML = "⏳ Verificando...";
 
-  // Check if usuario already exists
-  const check = await fetch(`${SUPABASE_URL}/rest/v1/tenants?usuario=eq.${usuario}&select=id`, {
-    headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` }
-  });
-  const existing = await check.json();
-  if (existing.length > 0) {
-    btn.disabled = false;
-    btn.innerHTML = '<img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__small@2x.png" style="height:18px" alt="MP" /> Continuar al pago';
-    return showError("Ese usuario ya está en uso, elegí otro");
-  }
-
-  // Create tenant (inactive until payment confirmed)
-  const tenantId = "t_" + Date.now();
-  const vencimiento = new Date(Date.now() + 7 * 86400000).toISOString().slice(0,10);
-
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/tenants`, {
+  const res = await fetch(EDGE_URL, {
     method: "POST",
-    headers: {
-      "apikey": SUPABASE_ANON,
-      "Authorization": `Bearer ${SUPABASE_ANON}`,
-      "Content-Type": "application/json",
-      "Prefer": "return=minimal"
-    },
-    body: JSON.stringify({
-      id: tenantId,
-      nombre,
-      usuario,
-      pass,
-      fecha_vencimiento: vencimiento,
-      plan_activo: false, // activates when payment confirmed
-      plan_nombre: "pro"
-    })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nombre, usuario, pass })
   });
+
+  const data = await res.json();
 
   if (!res.ok) {
     btn.disabled = false;
-    btn.innerHTML = '<img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__small@2x.png" style="height:18px" alt="MP" /> Continuar al pago';
-    return showError("Error al crear la cuenta. Intentá de nuevo.");
+    btn.innerHTML = "💳 Continuar al pago";
+    return showError(data.error === "Usuario ya existe"
+      ? "Ese usuario ya está en uso, elegí otro"
+      : "Error al crear la cuenta. Intentá de nuevo.");
   }
 
-  // Track with Facebook Pixel
   fbq('track', 'InitiateCheckout', {value: 80000, currency: 'ARS', content_name: 'Gestiona tu Panel'});
 
-  // Save credentials in sessionStorage so gracias.html can show them
   sessionStorage.setItem("gtp_usuario", usuario);
   sessionStorage.setItem("gtp_pass", pass);
   sessionStorage.setItem("gtp_nombre", nombre);
 
-  // Redirect to MercadoPago with external_reference
-  window.location.href = MP_LINK + `&external_reference=${tenantId}`;
+  window.location.href = MP_LINK + `&external_reference=${data.tenantId}`;
 }
 
 function showError(msg) {
