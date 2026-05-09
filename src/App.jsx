@@ -1312,8 +1312,18 @@ const CommsMonitor = ({ tid, supabase, fmt, empleados, config }) => {
 };
 
 // ─── EXTENSION SETTINGS ──────────────────────────────────────────────────────
-const ExtensionSettings = ({ tid }) => {
+const ExtensionSettings = ({ tid, supabase }) => {
   const [copiedRole, setCopiedRole] = useState(null);
+  const [iaActiva, setIaActiva] = useState(false);
+  useEffect(() => {
+    supabase.from("bot_config").select("activo").eq("tenant_id", tid).single()
+      .then(({ data }) => setIaActiva(data?.activo ?? false));
+  }, [tid]);
+  const toggleIA = async () => {
+    const newVal = !iaActiva;
+    setIaActiva(newVal);
+    await supabase.from("bot_config").upsert({ tenant_id: tid, activo: newVal }, { onConflict: "tenant_id" });
+  };
 
   const SUPA_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
   const SUPA_KEY = "sb_publishable_E64BlBT1wwUPfyrX0uxGyQ_oj_ItBCw";
