@@ -1752,7 +1752,7 @@ const Celulares = ({ tid, supabase, fmt }) => {
               <div style={{ fontSize:11,fontWeight:700,color: isOnline(c.ultimo_ping) ? "#10b981" : "#475569" }}>
                 {isOnline(c.ultimo_ping) ? "● Online" : "○ Offline"}
               </div>
-              <button onClick={() => supabase.from("celulares").update({activo:false}).eq("id",c.id).then(load)}
+              <button onClick={() => { if(confirm("¿Eliminar este celular?")) supabase.from("celulares").delete().eq("id",c.id).then(load); }}
                 style={{ padding:"4px 10px",borderRadius:6,background:"rgba(244,63,94,0.1)",border:"1px solid rgba(244,63,94,0.3)",color:"#f43f5e",fontSize:11,cursor:"pointer" }}>
                 Eliminar
               </button>
