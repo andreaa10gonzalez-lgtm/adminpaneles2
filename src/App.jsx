@@ -1626,6 +1626,144 @@ const CargasIA = ({ tid, supabase, fmt }) => {
   );
 };
 
+const Celulares = ({ tid, supabase, fmt }) => {
+  const [celulares, setCelulares] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [nombre, setNombre] = useState("");
+  const [rol, setRol] = useState("cobros");
+  const [qrData, setQrData] = useState(null);
+  const [generating, setGenerating] = useState(false);
+
+  const SUPABASE_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("celulares").select("*")
+      .eq("tenant_id", tid).order("created_at", { ascending: false });
+    setCelulares(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const generateQR = async () => {
+    if (!nombre) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/celular-connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tid, nombre, rol })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setQrData(data);
+        load();
+      }
+    } catch(e) { console.error(e); }
+    setGenerating(false);
+  };
+
+  const isOnline = (ping) => {
+    if (!ping) return false;
+    return Date.now() - new Date(ping).getTime() < 2 * 60 * 1000; // 2 min
+  };
+
+  const rolLabel = { cobros: "📥 Monitor de cobros", retiros: "📤 Ejecutor de retiros", ambos: "🔄 Cobros y retiros" };
+  const rolColor = { cobros: "#06b6d4", retiros: "#f59e0b", ambos: "#a78bfa" };
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+        <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📱</div>
+        <div>
+          <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#10b981" }}>Celulares conectados</h2>
+          <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Gestioná los celulares que monitorean cobros y ejecutan retiros</p>
+        </div>
+      </div>
+
+      {/* Generar QR */}
+      <div style={{ background:"#0f0d1f",border:"1px solid rgba(16,185,129,0.3)",borderRadius:16,padding:24,marginBottom:24 }}>
+        <div style={{ fontWeight:700,fontSize:15,marginBottom:16,color:"#10b981" }}>➕ Agregar nuevo celular</div>
+        <div style={{ display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end" }}>
+          <div style={{ flex:1,minWidth:200 }}>
+            <div style={{ fontSize:11,color:"#64748b",marginBottom:6,fontWeight:600,textTransform:"uppercase" }}>Nombre del celular</div>
+            <input value={nombre} onChange={e=>setNombre(e.target.value)}
+              placeholder="Ej: Celular Agus, Retiros MP"
+              style={{ width:"100%",background:"#141028",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:8,padding:"9px 12px",fontSize:13 }} />
+          </div>
+          <div style={{ minWidth:200 }}>
+            <div style={{ fontSize:11,color:"#64748b",marginBottom:6,fontWeight:600,textTransform:"uppercase" }}>Rol</div>
+            <select value={rol} onChange={e=>setRol(e.target.value)}
+              style={{ width:"100%",background:"#141028",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:8,padding:"9px 12px",fontSize:13 }}>
+              <option value="cobros">📥 Monitor de cobros</option>
+              <option value="retiros">📤 Ejecutor de retiros</option>
+              <option value="ambos">🔄 Cobros y retiros</option>
+            </select>
+          </div>
+          <button onClick={generateQR} disabled={!nombre || generating}
+            style={{ padding:"9px 20px",borderRadius:8,background:"#10b981",border:"none",color:"white",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap" }}>
+            {generating ? "⏳ Generando..." : "📱 Generar QR"}
+          </button>
+        </div>
+
+        {/* QR Display */}
+        {qrData && (
+          <div style={{ marginTop:20,padding:20,background:"#141028",borderRadius:12,border:"1px solid #10b981",textAlign:"center" }}>
+            <div style={{ fontWeight:700,fontSize:14,color:"#10b981",marginBottom:8 }}>QR generado para: {nombre}</div>
+            <div style={{ background:"white",padding:16,borderRadius:8,display:"inline-block",marginBottom:12 }}>
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData.qrData)}`}
+                alt="QR Code" style={{ width:200,height:200 }} />
+            </div>
+            <div style={{ fontSize:12,color:"#64748b",marginBottom:8 }}>
+              Abrí la app GTP Monitor en el celular y escaneá este QR
+            </div>
+            <div style={{ fontSize:11,color:"#475569",fontFamily:"monospace",background:"#0f0d1f",padding:"6px 12px",borderRadius:6,display:"inline-block" }}>
+              Token: {qrData.token.slice(0,16)}...
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Lista de celulares */}
+      <div style={{ fontWeight:700,fontSize:15,marginBottom:12 }}>Celulares registrados</div>
+      {loading ? (
+        <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div>
+      ) : celulares.length === 0 ? (
+        <div style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:40,textAlign:"center",color:"#64748b" }}>
+          No hay celulares registrados. Agregá el primero arriba.
+        </div>
+      ) : (
+        <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+          {celulares.map(c => (
+            <div key={c.id} style={{ background:"#0f0d1f",border:"1px solid",borderRadius:12,padding:"14px 18px",
+              borderColor: isOnline(c.ultimo_ping) ? "rgba(16,185,129,0.3)" : "#1e1a38",
+              display:"flex",alignItems:"center",gap:14,flexWrap:"wrap" }}>
+              <div style={{ width:10,height:10,borderRadius:"50%",flexShrink:0,
+                background: isOnline(c.ultimo_ping) ? "#10b981" : "#475569" }} />
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontWeight:700,fontSize:14 }}>{c.nombre}</div>
+                <div style={{ fontSize:11,color:"#64748b",marginTop:2 }}>
+                  <span style={{ color:rolColor[c.rol],fontWeight:600 }}>{rolLabel[c.rol]}</span>
+                  {c.ultimo_ping && <span style={{ marginLeft:8 }}>· Último ping: {new Date(c.ultimo_ping).toLocaleTimeString("es-AR")}</span>}
+                  {c.saldo_disponible > 0 && <span style={{ marginLeft:8,color:"#10b981" }}>· Saldo: {fmt(c.saldo_disponible)}</span>}
+                </div>
+              </div>
+              <div style={{ fontSize:11,fontWeight:700,color: isOnline(c.ultimo_ping) ? "#10b981" : "#475569" }}>
+                {isOnline(c.ultimo_ping) ? "● Online" : "○ Offline"}
+              </div>
+              <button onClick={() => supabase.from("celulares").update({activo:false}).eq("id",c.id).then(load)}
+                style={{ padding:"4px 10px",borderRadius:6,background:"rgba(244,63,94,0.1)",border:"1px solid rgba(244,63,94,0.3)",color:"#f43f5e",fontSize:11,cursor:"pointer" }}>
+                Eliminar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AyudaManual = ({ setActiveTab }) => {
   const [seccion, setSeccion] = useState("inicio");
 
@@ -3233,6 +3371,15 @@ const OwnerDashboard = ({ session, onLogout }) => {
                 transition:"all 150ms", whiteSpace:"nowrap" }}>
               ⚙️ Ajustes
             </button>
+            <button onClick={() => setActiveTab("celulares")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="celulares" ? "rgba(16,185,129,0.2)" : "transparent",
+                border: activeTab==="celulares" ? "1px solid #10b981" : "1px solid rgba(16,185,129,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="celulares" ? "#10b981" : "#64748b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              📱 Celulares
+            </button>
             <button onClick={() => setActiveTab("ayuda")}
               style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
                 background: activeTab==="ayuda" ? "rgba(6,182,212,0.2)" : "transparent",
@@ -4658,6 +4805,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "celulares" && (
+          <Celulares tid={tid} supabase={supabase} fmt={fmt} />
         )}
 
         {activeTab === "ayuda" && (
