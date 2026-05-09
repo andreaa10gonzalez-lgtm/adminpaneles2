@@ -1387,7 +1387,17 @@ const ExtensionSettings = ({ tid, supabase }) => {
           ⚠ No le des el código de dueño a los empleados — solo ellos pueden captar movimientos del casino.
         </div>
       </div>
-
+<div style={{...S.card, marginTop:14}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#a78bfa"}}>🤖 IA Auto-Responder</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Responde WhatsApp automáticamente</div>
+          </div>
+          <button onClick={toggleIA} style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,background:iaActiva?"rgba(16,185,129,0.2)":"rgba(100,116,139,0.2)",color:iaActiva?"#10b981":"#64748b",outline:iaActiva?"1px solid #10b981":"1px solid #475569"}}>
+            {iaActiva ? "✅ Activa" : "⭕ Inactiva"}
+          </button>
+        </div>
+      </div>
       <div style={{ ...S.card, marginTop: 14 }}>
         <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 12 }}>¿Qué puede hacer cada rol?</div>
         {[
