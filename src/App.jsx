@@ -214,9 +214,25 @@ const db = {
   getJugadores: async (tid) => { const { data } = await supabase.from("jugadores").select("*").eq("tenant_id", tid); return data || []; },
   upsertJugadores: async (players) => supabase.from("jugadores").upsert(players, { onConflict: "tenant_id,nombre" }),
   getTransactions: async (tid, fecha) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).eq("fecha", fecha).order("hora"); return data || []; },
-  getAllTransactions: async (tid) => { const { data } = await supabase.from("panel_transactions").select("*").eq("tenant_id", tid).order("hora"); return data || []; },
+  getAllTransactions: async (tid) => {
+    // Supabase default limit is 1000 — fetch all with range
+    let all = [], from = 0, chunk = 1000;
+    while (true) {
+      const { data, error } = await supabase.from("panel_transactions").select("*")
+        .eq("tenant_id", tid).order("fecha").order("hora").range(from, from + chunk - 1);
+      if (error || !data?.length) break;
+      all = all.concat(data);
+      if (data.length < chunk) break;
+      from += chunk;
+    }
+    return all;
+  },
   upsertTransactions: async (txs) => supabase.from("panel_transactions").upsert(txs, { onConflict: "tenant_id,fecha,hora,jugador,tipo" }),
   getJugadorStats: async (tid, mes) => { const { data } = await supabase.from("jugador_stats").select("*").eq("tenant_id", tid).eq("mes", mes); return data || []; },
+  getContactos: async (tid) => { const { data } = await supabase.from("jugadores_contactos").select("*").eq("tenant_id", tid).order("total_cargas", {ascending:false}); return data || []; },
+  getCreditos: async (tid) => { const { data } = await supabase.from("ocr_creditos").select("*").eq("tenant_id", tid).single(); return data || null; },
+  getOcrUso: async (tid) => { const { data } = await supabase.from("ocr_uso").select("*").eq("tenant_id", tid).gte("created_at", new Date(Date.now()-7*86400000).toISOString()).order("created_at",{ascending:false}); return data || []; },
+  upsertContacto: async (c) => supabase.from("jugadores_contactos").upsert(c, {onConflict:"tenant_id,username"}),
   upsertJugadorStats: async (stats) => supabase.from("jugador_stats").upsert(stats, { onConflict: "tenant_id,nombre,mes" }),
 
   // Campaña
@@ -968,22 +984,53 @@ const CajaResumenDueno = ({ cajaForm, bills, entries, empleados, calcPnTurno, ca
 const Movimientos = ({ tid, supabase, fmt }) => {
   const [txs, setTxs]         = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fecha, setFecha]     = useState(todayStr());
+  const [fechaDesde, setFechaDesde] = useState(todayStr());
+  const [fechaHasta, setFechaHasta] = useState(todayStr());
+  const [horaDesde, setHoraDesde]   = useState("");
+  const [horaHasta, setHoraHasta]   = useState("");
   const [filter, setFilter]   = useState("all");
+  const [modoRango, setModoRango] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+    let query = supabase
       .from("panel_transactions")
       .select("*")
       .eq("tenant_id", tid)
-      .eq("fecha", fecha)
+      .order("fecha", { ascending: false })
       .order("hora", { ascending: false });
-    setTxs(data || []);
+
+    if (modoRango) {
+      query = query.gte("fecha", fechaDesde).lte("fecha", fechaHasta);
+    } else {
+      query = query.eq("fecha", fechaDesde);
+    }
+
+    // Paginate to get all results without limit
+    let result = [], from = 0, chunk = 1000;
+    while (true) {
+      const { data: chunk_data, error } = await query.range(from, from + chunk - 1);
+      if (error || !chunk_data?.length) break;
+      result = result.concat(chunk_data);
+      if (chunk_data.length < chunk) break;
+      from += chunk;
+    }
+
+    // Filter by time range if set
+    if (horaDesde || horaHasta) {
+      result = result.filter(t => {
+        const h = t.hora?.slice(0,5) || "00:00";
+        if (horaDesde && h < horaDesde) return false;
+        if (horaHasta && h > horaHasta) return false;
+        return true;
+      });
+    }
+
+    setTxs(result);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [fecha]);
+  useEffect(() => { load(); }, [fechaDesde, fechaHasta, modoRango]);
 
   const filtered = filter === "all" ? txs : txs.filter(t => t.tipo === filter);
   const totalCargas  = txs.filter(t => t.tipo === "carga").reduce((s, t) => s + (+t.monto || 0), 0);
@@ -992,13 +1039,66 @@ const Movimientos = ({ tid, supabase, fmt }) => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
         <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, margin: 0, color: "#a78bfa" }}>
           📊 Movimientos capturados
         </h2>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...S.input, width: "auto", padding: "8px 12px" }} />
-          <button onClick={load} style={{ ...S.ghost, padding: "8px 14px" }}>↺ Actualizar</button>
+        <button onClick={load} style={{ ...S.ghost, padding: "8px 14px" }}>↺ Actualizar</button>
+      </div>
+
+      {/* Filtros de fecha y hora */}
+      <div style={{ ...S.card, marginBottom:16, display:"flex", flexWrap:"wrap", gap:12, alignItems:"center" }}>
+        <div style={{ display:"flex", gap:6 }}>
+          <button onClick={() => setModoRango(false)}
+            style={{ padding:"6px 14px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
+              background: !modoRango ? "rgba(124,58,237,0.15)" : "transparent",
+              borderColor: !modoRango ? "#7c3aed" : "#1e1a38", color: !modoRango ? "#a78bfa" : "#64748b" }}>
+            📅 Un día
+          </button>
+          <button onClick={() => setModoRango(true)}
+            style={{ padding:"6px 14px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
+              background: modoRango ? "rgba(124,58,237,0.15)" : "transparent",
+              borderColor: modoRango ? "#7c3aed" : "#1e1a38", color: modoRango ? "#a78bfa" : "#64748b" }}>
+            📆 Rango de fechas
+          </button>
+        </div>
+
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          {modoRango ? (
+            <>
+              <span style={{ fontSize:12, color:"#64748b" }}>Desde</span>
+              <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+                style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }} />
+              <span style={{ fontSize:12, color:"#64748b" }}>Hasta</span>
+              <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
+                style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }} />
+            </>
+          ) : (
+            <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+              style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }} />
+          )}
+        </div>
+
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <span style={{ fontSize:12, color:"#64748b" }}>🕐 Hora</span>
+          <input type="time" value={horaDesde} onChange={e => setHoraDesde(e.target.value)}
+            style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }}
+            placeholder="desde" />
+          <span style={{ fontSize:12, color:"#64748b" }}>—</span>
+          <input type="time" value={horaHasta} onChange={e => setHoraHasta(e.target.value)}
+            style={{ ...S.input, width:"auto", padding:"6px 10px", fontSize:12 }}
+            placeholder="hasta" />
+          <button onClick={load} style={{ padding:"6px 12px", borderRadius:8, background:"rgba(124,58,237,0.15)",
+            border:"1px solid #7c3aed", color:"#a78bfa", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+            Filtrar
+          </button>
+          {(horaDesde || horaHasta) && (
+            <button onClick={() => { setHoraDesde(""); setHoraHasta(""); setTimeout(load,100); }}
+              style={{ padding:"6px 10px", borderRadius:8, background:"transparent",
+                border:"1px solid #1e1a38", color:"#64748b", fontSize:11, cursor:"pointer" }}>
+              ✕ Limpiar hora
+            </button>
+          )}
         </div>
       </div>
 
@@ -1020,7 +1120,7 @@ const Movimientos = ({ tid, supabase, fmt }) => {
       {/* Source info */}
       <div style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 12, color: "#a78bfa", display: "flex", alignItems: "center", gap: 8 }}>
         <span>🔌</span>
-        <span>Estos movimientos fueron capturados automáticamente por la extensión. Para agregar más, abrí la plataforma del casino con la extensión activa.</span>
+        <span>Movimientos capturados por la extensión. {modoRango ? `${fechaDesde} al ${fechaHasta}` : fechaDesde}{horaDesde || horaHasta ? ` · ${horaDesde||"00:00"} — ${horaHasta||"23:59"}` : ""}</span>
       </div>
 
       {/* Filter */}
@@ -1065,7 +1165,9 @@ const Movimientos = ({ tid, supabase, fmt }) => {
                         {tx.tipo === "carga" ? "Carga" : "Retiro"}
                       </span>
                     </td>
-                    <td style={{ padding: "9px 14px", color: "#e2e8f0", fontWeight: 500 }}>{tx.jugador || "—"}</td>
+                    <td style={{ padding: "9px 14px", color: "#e2e8f0", fontWeight: 500 }}>
+                      {tx.jugador && !/^\d{4}\/\d{2}\/\d{2}/.test(tx.jugador) ? tx.jugador : "—"}
+                    </td>
                     <td style={{ padding: "9px 14px", fontWeight: 700, color: tx.tipo === "carga" ? "#10b981" : "#f43f5e", fontFamily: "'Space Grotesk',sans-serif" }}>
                       {tx.tipo === "retiro" ? "−" : ""}{fmt(+tx.monto || 0)}
                     </td>
@@ -1315,14 +1417,19 @@ const CommsMonitor = ({ tid, supabase, fmt, empleados, config }) => {
 const ExtensionSettings = ({ tid, supabase }) => {
   const [copiedRole, setCopiedRole] = useState(null);
   const [iaActiva, setIaActiva] = useState(false);
+
   useEffect(() => {
     supabase.from("bot_config").select("activo").eq("tenant_id", tid).single()
       .then(({ data }) => setIaActiva(data?.activo ?? false));
   }, [tid]);
+
   const toggleIA = async () => {
     const newVal = !iaActiva;
     setIaActiva(newVal);
-    await supabase.from("bot_config").upsert({ tenant_id: tid, activo: newVal }, { onConflict: "tenant_id" });
+    await supabase.from("bot_config").upsert({
+      tenant_id: tid,
+      activo: newVal
+    }, { onConflict: "tenant_id" });
   };
 
   const SUPA_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
@@ -1387,17 +1494,28 @@ const ExtensionSettings = ({ tid, supabase }) => {
           ⚠ No le des el código de dueño a los empleados — solo ellos pueden captar movimientos del casino.
         </div>
       </div>
-<div style={{...S.card, marginTop:14}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+
+      <div style={{ ...S.card, marginTop: 14 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
           <div>
-            <div style={{fontSize:13,fontWeight:700,color:"#a78bfa"}}>🤖 IA Auto-Responder</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>Responde WhatsApp automáticamente</div>
+            <div style={{ fontSize:13, fontWeight:700, color:"#a78bfa" }}>🤖 IA Auto-Responder</div>
+            <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>Responde WhatsApp automáticamente como empleado</div>
           </div>
-          <button onClick={toggleIA} style={{padding:"8px 18px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,background:iaActiva?"rgba(16,185,129,0.2)":"rgba(100,116,139,0.2)",color:iaActiva?"#10b981":"#64748b",outline:iaActiva?"1px solid #10b981":"1px solid #475569"}}>
+          <button onClick={toggleIA}
+            style={{ padding:"8px 18px", borderRadius:20, border:"none", cursor:"pointer", fontWeight:700, fontSize:12,
+              background: iaActiva ? "rgba(16,185,129,0.2)" : "rgba(100,116,139,0.2)",
+              color: iaActiva ? "#10b981" : "#64748b",
+              outline: iaActiva ? "1px solid #10b981" : "1px solid #475569" }}>
             {iaActiva ? "✅ Activa" : "⭕ Inactiva"}
           </button>
         </div>
+        {iaActiva && (
+          <div style={{ fontSize:11, color:"#f59e0b", background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:8, padding:"8px 12px" }}>
+            ⚡ La IA está respondiendo WhatsApp automáticamente. La extensión debe estar conectada y activa.
+          </div>
+        )}
       </div>
+
       <div style={{ ...S.card, marginTop: 14 }}>
         <div style={{ fontSize: 12, color: "#a78bfa", fontWeight: 700, marginBottom: 12 }}>¿Qué puede hacer cada rol?</div>
         {[
@@ -1417,37 +1535,824 @@ const ExtensionSettings = ({ tid, supabase }) => {
 };
 
 // ─── COMMS MENSAJES ───────────────────────────────────────────────────────────
-const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
-  const [mensajesWA, setMensajesWA] = useState([]);
+const CargasIA = ({ tid, supabase, fmt }) => {
+  const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
-  const [filtro, setFiltro] = useState("all"); // all | ok | sospechosa
-
-  const KEYWORDS_CONFIRMACION = ["cargad", "fichas ya fueron", "acredit", "cargoo", "cargadoo", "ya cargue", "ya te cargue", "listo cargado", "ya está cargado"];
-  const WINDOW_MIN = 30; // minutos de ventana para cruce
+  const [filtro, setFiltro] = useState("all"); // all | carga | retiro
+  const [dias, setDias] = useState(7);
 
   useEffect(() => {
-    supabase.from("ext_messages")
+    setLoading(true);
+    const desde = new Date(Date.now() - dias * 86400000).toISOString();
+    supabase.from("ocr_uso")
       .select("*")
       .eq("tenant_id", tid)
-      .eq("message_type", "outgoing")
-      .gte("timestamp", fecha + "T00:00:00")
-      .lte("timestamp", fecha + "T23:59:59")
-      .then(({ data }) => { setMensajesWA(data || []); setLoading(false); });
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setDatos((data || []).filter(r => r.imagen_resultado?.es_comprobante));
+        setLoading(false);
+      });
+  }, [dias]);
+
+  const filtrados = datos.filter(r => {
+    if (filtro === "all") return true;
+    return r.imagen_resultado?.tipo === filtro;
+  });
+
+  const totalCargas = datos.filter(r => r.imagen_resultado?.tipo === "carga").length;
+  const totalRetiros = datos.filter(r => r.imagen_resultado?.tipo === "retiro").length;
+  const montoCargas = datos.filter(r => r.imagen_resultado?.tipo === "carga")
+    .reduce((s, r) => s + (+r.imagen_resultado?.monto || 0), 0);
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+        <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#7c3aed,#4f46e5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>🤖</div>
+        <div style={{ flex:1 }}>
+          <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#a78bfa" }}>Cargas detectadas por IA</h2>
+          <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Comprobantes detectados automáticamente en WhatsApp</p>
+        </div>
+        <button onClick={() => { setLoading(true); const desde = new Date(Date.now() - dias * 86400000).toISOString(); supabase.from("ocr_uso").select("*").eq("tenant_id", tid).gte("created_at", desde).order("created_at", { ascending: false }).then(({ data }) => { setDatos((data || []).filter(r => r.imagen_resultado?.es_comprobante)); setLoading(false); }); }}
+          style={{ background:"rgba(124,58,237,0.15)", border:"1px solid rgba(124,58,237,0.3)", color:"#a78bfa",
+            padding:"8px 16px", borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", flexShrink:0 }}>
+          ↺ Actualizar
+        </button>
+      </div>
+
+      <div style={{ display:"flex", gap:10, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
+        {[7,15,30].map(d => (
+          <button key={d} onClick={() => setDias(d)}
+            style={{ padding:"6px 14px", borderRadius:20, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
+              background: dias===d ? "rgba(124,58,237,0.2)" : "transparent",
+              borderColor: dias===d ? "#7c3aed" : "#1e1a38",
+              color: dias===d ? "#a78bfa" : "#64748b" }}>
+            {d} días
+          </button>
+        ))}
+        <div style={{ marginLeft:"auto", display:"flex", gap:6 }}>
+          {[["all","Todos"],["carga","💰 Cargas"],["retiro","💸 Retiros"]].map(([v,l]) => (
+            <button key={v} onClick={() => setFiltro(v)}
+              style={{ padding:"6px 12px", borderRadius:20, border:"1px solid", fontSize:11, fontWeight:600, cursor:"pointer",
+                background: filtro===v ? "rgba(124,58,237,0.15)" : "transparent",
+                borderColor: filtro===v ? "#7c3aed" : "#1e1a38",
+                color: filtro===v ? "#a78bfa" : "#64748b" }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:16 }}>
+        {[
+          { label:"Comprobantes detectados", v:datos.length, c:"#a78bfa" },
+          { label:"💰 Cargas detectadas", v:totalCargas, c:"#10b981" },
+          { label:"Monto total cargas", v:fmt(montoCargas), c:"#f59e0b" },
+        ].map(x => (
+          <div key={x.label} style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:"12px 16px" }}>
+            <div style={{ fontSize:10,color:"#64748b",marginBottom:4 }}>{x.label}</div>
+            <div style={{ fontSize:20,fontWeight:800,color:x.c }}>{x.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div>
+      ) : filtrados.length === 0 ? (
+        <div style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:40,textAlign:"center",color:"#64748b" }}>
+          <div style={{ fontSize:32,marginBottom:8 }}>🤖</div>
+          <div>No hay comprobantes detectados en los últimos {dias} días.</div>
+          <div style={{ fontSize:12,marginTop:8 }}>Los comprobantes aparecen cuando los clientes mandan imágenes por WhatsApp y la IA las analiza.</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+          {filtrados.map((r,i) => {
+            const res = r.imagen_resultado;
+            const esCarga = res.tipo === "carga";
+            return (
+              <div key={i} style={{ background:"#0f0d1f",border:"1px solid",borderRadius:12,padding:"12px 16px",
+                borderColor: esCarga ? "rgba(16,185,129,0.25)" : "rgba(244,63,94,0.25)" }}>
+                <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+                  <div style={{ fontSize:24 }}>{esCarga ? "💰" : "💸"}</div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9" }}>
+                      {esCarga ? "Carga" : "Retiro"} de <span style={{ color: esCarga ? "#10b981" : "#f43f5e" }}>${res.monto?.toLocaleString() || "?"}</span>
+                      {res.jugador && <span style={{ color:"#a78bfa",marginLeft:8 }}>· {res.jugador}</span>}
+                    </div>
+                    <div style={{ fontSize:11,color:"#64748b",marginTop:2 }}>
+                      {r.chat_id && <span>De: {r.chat_id} · </span>}
+                      {res.banco_origen && <span>{res.banco_origen} · </span>}
+                      {new Date(r.created_at).toLocaleString("es-AR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right",flexShrink:0 }}>
+                    <div style={{ fontSize:11,fontWeight:600,
+                      color: res.confianza==="alta" ? "#10b981" : res.confianza==="media" ? "#f59e0b" : "#f43f5e" }}>
+                      Confianza {res.confianza}
+                    </div>
+                    <div style={{ fontSize:10,color:"#64748b" }}>{r.tokens_usados} tokens</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Celulares = ({ tid, supabase, fmt }) => {
+  const [celulares, setCelulares] = useState([]);
+  const [billeteras, setBilleteras] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [nombre, setNombre] = useState("");
+  const [rol, setRol] = useState("cobros");
+  const [qrData, setQrData] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [newBilletera, setNewBilletera] = useState({});
+
+  const SUPABASE_URL = "https://rpqfzsrmmamfhxxarvvf.supabase.co";
+
+  const load = async () => {
+    setLoading(true);
+    const { data: cels } = await supabase.from("celulares").select("*")
+      .eq("tenant_id", tid).order("created_at", { ascending: false });
+    setCelulares(cels || []);
+
+    // Load billeteras for each celular
+    if (cels?.length) {
+      const { data: bills } = await supabase.from("celular_billeteras")
+        .select("*").eq("tenant_id", tid).eq("activa", true);
+      const grouped = {};
+      (bills || []).forEach(b => {
+        if (!grouped[b.celular_id]) grouped[b.celular_id] = [];
+        grouped[b.celular_id].push(b);
+      });
+      setBilleteras(grouped);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const generateQR = async () => {
+    if (!nombre) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/celular-connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tid, nombre, rol })
+      });
+      const data = await res.json();
+      if (data.ok) { setQrData(data); load(); }
+    } catch(e) { console.error(e); }
+    setGenerating(false);
+  };
+
+  const addBilletera = async (celularId) => {
+    const form = newBilletera[celularId] || {};
+    if (!form.billetera || !form.alias) return;
+    await supabase.from("celular_billeteras").insert({
+      celular_id: celularId,
+      tenant_id: tid,
+      billetera: form.billetera,
+      alias: form.alias,
+      titular: form.titular || "",
+      activa: true
+    });
+    setNewBilletera(prev => ({ ...prev, [celularId]: {} }));
+    load();
+  };
+
+  const removeBilletera = async (id) => {
+    await supabase.from("celular_billeteras").update({ activa: false }).eq("id", id);
+    load();
+  };
+
+  const isOnline = (ping) => ping && Date.now() - new Date(ping).getTime() < 2 * 60 * 1000;
+  const rolLabel = { cobros: "📥 Cobros", retiros: "📤 Retiros", ambos: "🔄 Ambos" };
+  const rolColor = { cobros: "#06b6d4", retiros: "#f59e0b", ambos: "#a78bfa" };
+  const billeteraIcon = { mercadopago: "🔵", lemon: "🟡", naranja: "🟠", banco: "🏦" };
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:28 }}>
+        <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📱</div>
+        <div>
+          <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#10b981" }}>Celulares conectados</h2>
+          <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Gestioná los celulares y sus billeteras para cobros y retiros</p>
+        </div>
+      </div>
+
+      {/* Generar QR */}
+      <div style={{ background:"#0f0d1f",border:"1px solid rgba(16,185,129,0.3)",borderRadius:16,padding:24,marginBottom:24 }}>
+        <div style={{ fontWeight:700,fontSize:15,marginBottom:16,color:"#10b981" }}>➕ Agregar nuevo celular</div>
+        <div style={{ display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end" }}>
+          <div style={{ flex:1,minWidth:200 }}>
+            <div style={{ fontSize:11,color:"#64748b",marginBottom:6,fontWeight:600,textTransform:"uppercase" }}>Nombre</div>
+            <input value={nombre} onChange={e=>setNombre(e.target.value)}
+              placeholder="Ej: Celular Agus, Retiros MP"
+              style={{ width:"100%",background:"#141028",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:8,padding:"9px 12px",fontSize:13 }} />
+          </div>
+          <div style={{ minWidth:180 }}>
+            <div style={{ fontSize:11,color:"#64748b",marginBottom:6,fontWeight:600,textTransform:"uppercase" }}>Rol</div>
+            <select value={rol} onChange={e=>setRol(e.target.value)}
+              style={{ width:"100%",background:"#141028",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:8,padding:"9px 12px",fontSize:13 }}>
+              <option value="cobros">📥 Monitor de cobros</option>
+              <option value="retiros">📤 Ejecutor de retiros</option>
+              <option value="ambos">🔄 Cobros y retiros</option>
+            </select>
+          </div>
+          <button onClick={generateQR} disabled={!nombre || generating}
+            style={{ padding:"9px 20px",borderRadius:8,background:"#10b981",border:"none",color:"white",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap" }}>
+            {generating ? "⏳ Generando..." : "📱 Generar QR"}
+          </button>
+        </div>
+
+        {qrData && (
+          <div style={{ marginTop:20,padding:20,background:"#141028",borderRadius:12,border:"1px solid #10b981",textAlign:"center" }}>
+            <div style={{ fontWeight:700,fontSize:14,color:"#10b981",marginBottom:8 }}>QR generado para: {nombre}</div>
+            <div style={{ background:"white",padding:16,borderRadius:8,display:"inline-block",marginBottom:12 }}>
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData.qrData)}`}
+                alt="QR Code" style={{ width:200,height:200 }} />
+            </div>
+            <div style={{ fontSize:12,color:"#64748b" }}>Escaneá este QR desde la app GTP Monitor</div>
+          </div>
+        )}
+      </div>
+
+      {/* Lista de celulares */}
+      <div style={{ fontWeight:700,fontSize:15,marginBottom:12 }}>Celulares registrados</div>
+      {loading ? (
+        <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div>
+      ) : celulares.length === 0 ? (
+        <div style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:40,textAlign:"center",color:"#64748b" }}>
+          No hay celulares registrados todavía.
+        </div>
+      ) : (
+        <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+          {celulares.map(c => {
+            const bills = billeteras[c.id] || [];
+            const form = newBilletera[c.id] || {};
+            return (
+              <div key={c.id} style={{ background:"#0f0d1f",border:"1px solid",borderRadius:14,
+                borderColor: isOnline(c.ultimo_ping) ? "rgba(16,185,129,0.3)" : "#1e1a38" }}>
+
+                {/* Header row */}
+                <div style={{ display:"flex",alignItems:"center",gap:12,padding:"14px 18px" }}>
+                  <div style={{ width:10,height:10,borderRadius:"50%",flexShrink:0,
+                    background: isOnline(c.ultimo_ping) ? "#10b981" : "#475569" }} />
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontWeight:700,fontSize:14 }}>{c.nombre}</div>
+                    <div style={{ fontSize:11,color:"#64748b",marginTop:2,display:"flex",gap:8,flexWrap:"wrap" }}>
+                      <span style={{ color:rolColor[c.rol],fontWeight:600 }}>{rolLabel[c.rol]}</span>
+                      {c.ultimo_ping && <span>· Ping: {new Date(c.ultimo_ping).toLocaleTimeString("es-AR")}</span>}
+                    </div>
+                  </div>
+                  <div style={{ fontSize:11,fontWeight:700,color: isOnline(c.ultimo_ping) ? "#10b981" : "#475569" }}>
+                    {isOnline(c.ultimo_ping) ? "● Online" : "○ Offline"}
+                  </div>
+                  <button onClick={() => { if(confirm("¿Eliminar este celular?")) supabase.from("celulares").delete().eq("id",c.id).then(load); }}
+                    style={{ padding:"4px 10px",borderRadius:6,background:"rgba(244,63,94,0.1)",border:"1px solid rgba(244,63,94,0.3)",color:"#f43f5e",fontSize:11,cursor:"pointer" }}>
+                    🗑
+                  </button>
+                </div>
+
+                {/* Billeteras - always visible */}
+                <div style={{ borderTop:"1px solid #1e1a38",padding:"12px 16px" }}>
+                  <div style={{ fontWeight:700,fontSize:12,marginBottom:8,color:"#a78bfa" }}>💳 Billeteras y alias</div>
+                  
+                  {bills.length === 0 && (
+                    <div style={{ fontSize:12,color:"#475569",marginBottom:8 }}>Sin billeteras — agregá una abajo</div>
+                  )}
+                  {bills.map(b => (
+                    <div key={b.id} style={{ display:"flex",alignItems:"center",gap:10,padding:"7px 10px",
+                      background:"#141028",borderRadius:8,marginBottom:5 }}>
+                      <span>{billeteraIcon[b.billetera] || "💳"}</span>
+                      <div style={{ flex:1 }}>
+                        <span style={{ fontWeight:700,fontSize:12,textTransform:"capitalize" }}>{b.billetera}</span>
+                        <span style={{ fontSize:12,color:"#64748b",marginLeft:8 }}>{b.alias}{b.titular ? ` · ${b.titular}` : ""}</span>
+                      </div>
+                      <button onClick={() => removeBilletera(b.id)}
+                        style={{ padding:"2px 7px",borderRadius:5,background:"rgba(244,63,94,0.1)",border:"1px solid rgba(244,63,94,0.3)",color:"#f43f5e",fontSize:11,cursor:"pointer" }}>
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add billetera form */}
+                  <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginTop:8,alignItems:"center" }}>
+                    <select value={form.billetera || ""} onChange={e => setNewBilletera(p=>({...p,[c.id]:{...form,billetera:e.target.value}}))}
+                      style={{ background:"#141028",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:7,padding:"6px 8px",fontSize:12 }}>
+                      <option value="">+ Billetera</option>
+                      <option value="mercadopago">🔵 MercadoPago</option>
+                      <option value="lemon">🟡 Lemon</option>
+                      <option value="naranja">🟠 Naranja X</option>
+                      <option value="banco">🏦 Banco</option>
+                    </select>
+                    <input value={form.alias || ""} onChange={e => setNewBilletera(p=>({...p,[c.id]:{...form,alias:e.target.value}}))}
+                      placeholder="CBU o alias"
+                      style={{ flex:1,minWidth:100,background:"#141028",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:7,padding:"6px 8px",fontSize:12 }} />
+                    <input value={form.titular || ""} onChange={e => setNewBilletera(p=>({...p,[c.id]:{...form,titular:e.target.value}}))}
+                      placeholder="Titular (opcional)"
+                      style={{ flex:1,minWidth:80,background:"#141028",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:7,padding:"6px 8px",fontSize:12 }} />
+                    <button onClick={() => addBilletera(c.id)} disabled={!form.billetera || !form.alias}
+                      style={{ padding:"6px 12px",borderRadius:7,background:"rgba(124,58,237,0.2)",border:"1px solid rgba(124,58,237,0.4)",color:"#a78bfa",fontSize:12,fontWeight:700,cursor:"pointer",opacity:(!form.billetera||!form.alias)?0.4:1 }}>
+                      + Agregar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AyudaManual = ({ setActiveTab }) => {
+  const [seccion, setSeccion] = useState("inicio");
+
+  const SECCIONES = [
+    { id:"inicio",      icon:"🏠", label:"Inicio",           color:"#a78bfa" },
+    { id:"extension",   icon:"🔌", label:"La extensión",     color:"#06b6d4" },
+    { id:"dashboard",   icon:"📊", label:"Dashboard",        color:"#10b981" },
+    { id:"caja",        icon:"💰", label:"Caja",             color:"#f59e0b" },
+    { id:"cruce",       icon:"🔍", label:"Cruce de Cargas",  color:"#f43f5e" },
+    { id:"movimientos", icon:"📋", label:"Movimientos",      color:"#a78bfa" },
+    { id:"jugadores",   icon:"👥", label:"Jugadores",        color:"#10b981" },
+    { id:"whatsapp",    icon:"💬", label:"WhatsApp",         color:"#25D366" },
+    { id:"ia",          icon:"🤖", label:"IA Analista",      color:"#7c3aed" },
+    { id:"ocr",         icon:"⚡", label:"OCR Comprobantes", color:"#f59e0b" },
+    { id:"ajustes_h",   icon:"⚙️", label:"Ajustes",          color:"#64748b" },
+    { id:"faq",         icon:"❓", label:"Preguntas frecuentes", color:"#94a3b8" },
+  ];
+
+  const Btn = ({ tab, label }) => (
+    <button onClick={() => setActiveTab(tab)}
+      style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(124,58,237,0.15)",
+        border:"1px solid rgba(124,58,237,0.3)", color:"#a78bfa", padding:"6px 12px",
+        borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer", textDecoration:"none" }}>
+      → Ir a {label}
+    </button>
+  );
+
+  const renderContenido = () => {
+    switch(seccion) {
+      case "inicio": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#06b6d4" }}>Bienvenido a Gestiona tu Panel</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Gestiona tu Panel es tu herramienta de control total para paneles online. Detecta cargas, cruza comprobantes de WhatsApp, monitorea a tus empleados y te avisa si algo está mal — todo automáticamente.
+          </p>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:24 }}>
+            {[
+              ["🔌","Instalar la extensión","El primer paso. Sin la extensión no hay captura de datos.","extension"],
+              ["📊","Ver el Dashboard","Tu resumen del negocio en tiempo real.","dashboard"],
+              ["🔍","Cruce de Cargas","La herramienta anti-fraude más importante.","cruce"],
+              ["💬","Monitor WhatsApp","Controlá que tus empleados atiendan bien.","whatsapp"],
+            ].map(([icon,title,desc,id]) => (
+              <div key={id} onClick={() => setSeccion(id)}
+                style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:16,cursor:"pointer",transition:"border-color 0.2s" }}
+                onMouseOver={e=>e.currentTarget.style.borderColor="#7c3aed"}
+                onMouseOut={e=>e.currentTarget.style.borderColor="#1e1a38"}>
+                <div style={{ fontSize:24,marginBottom:8 }}>{icon}</div>
+                <div style={{ fontWeight:700,fontSize:14,marginBottom:4 }}>{title}</div>
+                <div style={{ fontSize:12,color:"#64748b" }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:"#0f0d1f",border:"1px solid rgba(37,211,102,0.3)",borderRadius:12,padding:16,display:"flex",alignItems:"center",gap:12 }}>
+            <span style={{ fontSize:24 }}>💬</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700,fontSize:14,marginBottom:3 }}>¿Necesitás ayuda?</div>
+              <div style={{ fontSize:12,color:"#64748b" }}>Contactanos por WhatsApp y te respondemos a la brevedad.</div>
+            </div>
+            <a href="https://wa.me/5492236339337?text=Hola%2C+necesito+ayuda+con+Gestiona+tu+Panel" target="_blank"
+              style={{ background:"#25D366",color:"white",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap" }}>
+              💬 Soporte
+            </a>
+          </div>
+        </div>
+      );
+
+      case "extension": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#06b6d4" }}>🔌 La extensión del navegador</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            La extensión es un complemento que instalás en Chrome o Edge en la PC de cada empleado. Funciona en segundo plano y captura automáticamente los movimientos del panel del casino y los mensajes de WhatsApp.
+          </p>
+          <div style={{ background:"#0f0d1f",border:"1px solid rgba(124,58,237,0.3)",borderRadius:12,padding:16,marginBottom:20 }}>
+            <div style={{ fontWeight:700,fontSize:14,marginBottom:12,color:"#a78bfa" }}>Qué captura la extensión</div>
+            {["Transacciones del casino: cargas y retiros con jugador, monto y horario","Mensajes de WhatsApp Web: entrantes de clientes y salientes del empleado","Imágenes de comprobantes para análisis con IA","Tiempo de respuesta de cada empleado","Chats sin respuesta para generar alertas"].map((item,i) => (
+              <div key={i} style={{ display:"flex",gap:8,marginBottom:6,fontSize:13,color:"#94a3b8" }}>
+                <span style={{ color:"#10b981",flexShrink:0 }}>✓</span>{item}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontWeight:700,fontSize:15,marginBottom:12 }}>Instalación paso a paso</div>
+          {[
+            ["1","Descargá el ZIP","Hacé click en el botón de abajo y guardá el archivo."],
+            ["2","Descomprimí","Click derecho en el ZIP → Extraer aquí. Guardalo en una carpeta fija, no la muevas después."],
+            ["3","Abrí extensiones","En Edge: edge://extensions — En Chrome: chrome://extensions"],
+            ["4","Modo desarrollador","Activá el switch 'Modo de desarrollador'."],
+            ["5","Cargar extensión","Click en 'Cargar descomprimida' y seleccioná la carpeta extraída."],
+            ["6","Conectar","Click en el ícono naranja de la extensión, ingresá tu usuario y contraseña del panel."],
+          ].map(([num,title,desc]) => (
+            <div key={num} style={{ display:"flex",gap:12,marginBottom:12,alignItems:"flex-start" }}>
+              <div style={{ width:28,height:28,borderRadius:8,background:"rgba(6,182,212,0.15)",border:"1px solid rgba(6,182,212,0.3)",color:"#06b6d4",fontSize:12,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>{num}</div>
+              <div><div style={{ fontWeight:700,fontSize:13,marginBottom:2 }}>{title}</div><div style={{ fontSize:12,color:"#64748b" }}>{desc}</div></div>
+            </div>
+          ))}
+          <a href="https://drive.google.com/file/d/1U11qgzG4Blikmn3Xq15RqIRnpdNjI7Op/view?usp=sharing" target="_blank"
+            style={{ display:"inline-flex",alignItems:"center",gap:8,background:"rgba(6,182,212,0.15)",border:"1px solid rgba(6,182,212,0.4)",color:"#06b6d4",padding:"12px 20px",borderRadius:10,fontSize:14,fontWeight:700,textDecoration:"none",marginTop:8 }}>
+            ⬇️ Descargar extensión ZIP
+          </a>
+        </div>
+      );
+
+      case "dashboard": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#10b981" }}>📊 Dashboard</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>El Dashboard es tu pantalla principal. Muestra el resumen del mes con comparativa automática contra el mes anterior.</p>
+          <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:20 }}>
+            {[
+              ["Cargas del mes","Total de dinero ingresado este mes","verde"],
+              ["Retiros del mes","Total retirado","rojo"],
+              ["Neto del mes","Cargas menos retiros — tu ganancia bruta","violeta"],
+              ["Jugadores nuevos","Nuevos jugadores registrados este mes","naranja"],
+              ["Jugadores activos","Total con actividad este mes","cyan"],
+              ["Alertas de caja","Diferencias detectadas en cajas","amarillo"],
+            ].map(([k,v]) => (
+              <div key={k} style={{ display:"flex",gap:12,padding:"10px 14px",background:"#0f0d1f",borderRadius:10,border:"1px solid #1e1a38",fontSize:13 }}>
+                <span style={{ fontWeight:700,minWidth:140 }}>{k}</span>
+                <span style={{ color:"#64748b" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",marginBottom:16 }}>
+            💡 La comparativa es proporcional: si hoy es día 15, compara los primeros 15 días de este mes con los primeros 15 días del mes anterior.
+          </div>
+          <Btn tab="resumen" label="Dashboard" />
+        </div>
+      );
+
+      case "caja": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#f59e0b" }}>💰 Caja</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Registrá la apertura y cierre de cada turno. El panel calcula automáticamente si hay sobrante o faltante.
+          </p>
+          {[
+            ["Cargar turno","Seleccionás la fecha y el empleado. Ingresás los montos de apertura (MercadoPago, efectivo, etc.) y los de cierre al final del turno."],
+            ["Cálculo automático","El panel suma las cargas y retiros del turno y calcula el neto esperado. Lo compara con el cierre real."],
+            ["Diferencias","Si hay faltante (rojo) o sobrante (verde) aparece en el historial y en las alertas del Dashboard."],
+          ].map(([t,d],i) => (
+            <div key={i} style={{ display:"flex",gap:12,marginBottom:12 }}>
+              <div style={{ width:8,borderRadius:4,background:"rgba(245,158,11,0.4)",flexShrink:0 }}></div>
+              <div><div style={{ fontWeight:700,fontSize:13,marginBottom:3 }}>{t}</div><div style={{ fontSize:13,color:"#64748b",lineHeight:1.6 }}>{d}</div></div>
+            </div>
+          ))}
+          <div style={{ display:"flex",gap:8,marginTop:8 }}>
+            <Btn tab="caja" label="Caja" />
+          </div>
+        </div>
+      );
+
+      case "cruce": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#f43f5e" }}>🔍 Cruce de Cargas</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            La herramienta anti-fraude más importante. Cruza cada transacción del casino con los comprobantes de pago detectados en WhatsApp.
+          </p>
+          <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:20 }}>
+            {[
+              ["✅ Verificada · OCR nombre+monto","Hay comprobante del mismo jugador con monto similar en horario cercano. Sin acción requerida.","rgba(16,185,129,0.08)","rgba(16,185,129,0.3)"],
+              ["✅ Verificada · OCR solo monto","Hay comprobante con monto similar pero el nombre no coincide exactamente. Verificar manualmente.","rgba(16,185,129,0.05)","rgba(16,185,129,0.2)"],
+              ["✅ Verificada · nombre+hora","El empleado confirmó la carga por mensaje y el nombre coincide.","rgba(16,185,129,0.05)","rgba(16,185,129,0.15)"],
+              ["⚠️ Sospechosa","Hay una transacción en el panel pero NO hay comprobante de pago. INVESTIGAR — posible fraude.","rgba(244,63,94,0.08)","rgba(244,63,94,0.4)"],
+              ["⏳ Pendiente","Hay comprobante en WhatsApp pero la transacción aún no apareció. Esperá o verificá.","rgba(245,158,11,0.08)","rgba(245,158,11,0.3)"],
+            ].map(([estado,desc,bg,border]) => (
+              <div key={estado} style={{ background:bg,border:`1px solid ${border}`,borderRadius:10,padding:"12px 14px" }}>
+                <div style={{ fontWeight:700,fontSize:13,marginBottom:4 }}>{estado}</div>
+                <div style={{ fontSize:12,color:"#94a3b8" }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",marginBottom:16 }}>
+            🚨 <strong style={{ color:"#f43f5e" }}>Carga sospechosa:</strong> alguien cargó fichas sin haber recibido dinero del cliente. Investigá inmediatamente con el empleado del turno.
+          </div>
+          <Btn tab="cruce" label="Cruce de Cargas" />
+        </div>
+      );
+
+      case "movimientos": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#a78bfa" }}>📋 Movimientos</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Todas las transacciones capturadas por la extensión. Podés filtrar por fecha, rango y horario.
+          </p>
+          {["Filtro por día o rango de fechas (toda la semana, el mes completo, etc.)","Filtro por horario: solo el turno de la tarde de 16:00 a 00:00","Filtro por tipo: Cargas, Retiros o Todos","Totales automáticos del período filtrado"].map((item,i) => (
+            <div key={i} style={{ display:"flex",gap:8,marginBottom:8,fontSize:13,color:"#94a3b8" }}>
+              <span style={{ color:"#a78bfa",flexShrink:0 }}>→</span>{item}
+            </div>
+          ))}
+          <div style={{ background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",margin:"16px 0" }}>
+            💡 Los movimientos solo aparecen si la extensión está instalada y el empleado tiene el panel del casino abierto mientras trabaja.
+          </div>
+          <Btn tab="movimientos" label="Movimientos" />
+        </div>
+      );
+
+      case "jugadores": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#10b981" }}>👥 Jugadores</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>Analizá tu base de jugadores para tomar mejores decisiones de negocio.</p>
+          <div style={{ display:"flex",flexDirection:"column",gap:6,marginBottom:20 }}>
+            {[
+              ["Ranking","Top 20 jugadores del mes por volumen. Identificá tus mejores clientes.","ranking"],
+              ["Inactivos","Jugadores sin actividad en 15+ días. Candidatos para recuperar.","inactivos"],
+              ["Horarios Pico","A qué hora conviene tener más operadores disponibles.","horarios"],
+              ["Contactos","Base con username + número de WhatsApp.","contactos"],
+              ["Recuperación","Lista de inactivos por prioridad con exportación CSV.","recuperacion"],
+            ].map(([t,d,tab]) => (
+              <div key={tab} style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:10,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12 }}>
+                <div>
+                  <div style={{ fontWeight:700,fontSize:13,marginBottom:2 }}>{t}</div>
+                  <div style={{ fontSize:12,color:"#64748b" }}>{d}</div>
+                </div>
+                <Btn tab={tab} label={t} />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      case "whatsapp": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#25D366" }}>💬 Monitor WhatsApp</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Controlá en tiempo real que tus empleados atiendan bien a los clientes.
+          </p>
+          {[
+            ["🔴 Alerta roja","Cliente esperando más de 5 minutos sin respuesta — acción requerida"],
+            ["🟢 Verde","Todos los clientes atendidos"],
+            ["⏱ Tiempo de respuesta","Medí el promedio de cada empleado por turno"],
+            ["📋 Cargas IA","Comprobantes detectados automáticamente por OCR con monto, banco y titular"],
+          ].map(([k,v],i) => (
+            <div key={i} style={{ display:"flex",gap:10,padding:"10px 14px",background:"#0f0d1f",borderRadius:10,border:"1px solid #1e1a38",fontSize:13,marginBottom:6 }}>
+              <span style={{ fontWeight:700,minWidth:160 }}>{k}</span>
+              <span style={{ color:"#64748b" }}>{v}</span>
+            </div>
+          ))}
+          <div style={{ display:"flex",gap:8,marginTop:16,flexWrap:"wrap" }}>
+            <Btn tab="comms_monitor" label="Monitor" />
+            <Btn tab="cargas_ia" label="Cargas IA" />
+            <Btn tab="rendimiento" label="Rendimiento" />
+          </div>
+        </div>
+      );
+
+      case "ia": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#7c3aed" }}>🤖 IA Analista</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            Tu analista de negocios disponible 24/7. Tiene acceso a todos tus datos y podés preguntarle cualquier cosa.
+          </p>
+          <div style={{ fontWeight:700,fontSize:14,marginBottom:10 }}>Ejemplos de preguntas:</div>
+          <div style={{ display:"flex",flexDirection:"column",gap:6,marginBottom:20 }}>
+            {[
+              "¿Cómo viene el mes comparado con el anterior?",
+              "¿Hay algo sospechoso en las cargas de hoy?",
+              "¿Cuáles fueron los mejores días de esta semana?",
+              "¿Qué jugadores están en riesgo de abandono?",
+              "¿Cuál es el empleado con mejor tiempo de respuesta?",
+              "¿A qué hora conviene tener más operadores?",
+            ].map((q,i) => (
+              <div key={i} style={{ background:"#0f0d1f",border:"1px solid rgba(124,58,237,0.2)",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#94a3b8" }}>
+                💬 "{q}"
+              </div>
+            ))}
+          </div>
+          <Btn tab="ia" label="IA Analista" />
+        </div>
+      );
+
+      case "ocr": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#f59e0b" }}>⚡ OCR — Análisis de comprobantes</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>
+            La extensión detecta automáticamente cuando un cliente manda una imagen de comprobante por WhatsApp y la analiza con IA para extraer el monto, banco y titular.
+          </p>
+          {[
+            ["1","Cliente manda comprobante","El cliente envía una foto del comprobante por WhatsApp."],
+            ["2","Extensión detecta la imagen","La extensión la captura automáticamente sin que el empleado haga nada."],
+            ["3","IA analiza el comprobante","Extrae: monto, banco, titular, tipo de operación y nivel de confianza."],
+            ["4","Se registra en el panel","Aparece en Comunicaciones → Cargas IA y se usa para el Cruce de Cargas."],
+          ].map(([num,t,d]) => (
+            <div key={num} style={{ display:"flex",gap:12,marginBottom:12 }}>
+              <div style={{ width:28,height:28,borderRadius:8,background:"rgba(245,158,11,0.15)",border:"1px solid rgba(245,158,11,0.3)",color:"#f59e0b",fontSize:12,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>{num}</div>
+              <div><div style={{ fontWeight:700,fontSize:13,marginBottom:2 }}>{t}</div><div style={{ fontSize:12,color:"#64748b" }}>{d}</div></div>
+            </div>
+          ))}
+          <div style={{ background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:10,padding:14,fontSize:13,color:"#94a3b8",margin:"16px 0" }}>
+            💡 Los créditos OCR son opcionales. Sin ellos el panel funciona completo, simplemente no analiza imágenes automáticamente. Contactá soporte para activarlos.
+          </div>
+          <Btn tab="creditos" label="Créditos OCR" />
+        </div>
+      );
+
+      case "ajustes_h": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:8,color:"#64748b" }}>⚙️ Ajustes</h2>
+          <p style={{ color:"#94a3b8",fontSize:14,lineHeight:1.7,marginBottom:20 }}>Configurá tu panel, empleados y billeteras.</p>
+          {[
+            ["Empleados","Agregá o desactivá empleados. Cada uno tiene su turno y su código de conexión para la extensión."],
+            ["Billeteras","Registrá las cuentas y alias donde recibís los pagos."],
+            ["Sueldos","Configurá el sueldo base por turno para el cálculo automático de liquidación."],
+            ["Plan","Información de tu plan activo y fecha de vencimiento."],
+          ].map(([t,d],i) => (
+            <div key={i} style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:10,padding:"12px 14px",marginBottom:8 }}>
+              <div style={{ fontWeight:700,fontSize:13,marginBottom:3 }}>{t}</div>
+              <div style={{ fontSize:12,color:"#64748b" }}>{d}</div>
+            </div>
+          ))}
+          <Btn tab="ajustes" label="Ajustes" />
+        </div>
+      );
+
+      case "faq": return (
+        <div>
+          <h2 style={{ fontSize:22,fontWeight:800,marginBottom:16,color:"#94a3b8" }}>❓ Preguntas frecuentes</h2>
+          <div style={{ display:"flex",flexDirection:"column",gap:0 }}>
+            {[
+              ["¿La extensión lee mis mensajes personales?","No. Solo guarda el contacto, la hora y si fue entrante o saliente. No guarda el contenido de mensajes personales."],
+              ["¿Qué pasa si el empleado cierra el navegador?","La captura se pausa hasta que lo vuelve a abrir. No se pierde ningún dato ya capturado."],
+              ["¿El panel funciona en el celular?","Sí, es responsive. La extensión solo funciona en Chrome o Edge de escritorio."],
+              ["¿Con qué frecuencia se actualizan los datos?","WhatsApp cada 30 segundos. Movimientos en tiempo real mientras el empleado tiene el panel del casino abierto."],
+              ["¿Cómo agrego un nuevo empleado?","Ajustes → Empleados → Agregar. El sistema genera el código de conexión para la extensión."],
+              ["¿Qué hago si veo una carga sospechosa?","Comunicarte con el empleado del turno y verificar si el cliente pagó. Si no hay comprobante y el empleado no puede justificarlo, es fraude."],
+              ["¿Cómo renuevo el plan?","El cobro es automático por MercadoPago. Si cancelás o hay un problema escribinos al WhatsApp de soporte."],
+            ].map(([q,a],i) => (
+              <div key={i} style={{ borderBottom:"1px solid #1e1a38",padding:"14px 0" }}>
+                <div style={{ fontWeight:700,fontSize:13,color:"#a78bfa",marginBottom:5 }}>P: {q}</div>
+                <div style={{ fontSize:13,color:"#64748b",lineHeight:1.6 }}>R: {a}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      default: return null;
+    }
+  };
+
+  return (
+    <div style={{ display:"flex", gap:24, alignItems:"flex-start" }}>
+      {/* Sidebar */}
+      <div style={{ width:200, flexShrink:0, background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:16, padding:12, position:"sticky", top:80 }}>
+        <div style={{ fontSize:11,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10,padding:"0 4px" }}>Manual</div>
+        {SECCIONES.map(s => (
+          <button key={s.id} onClick={() => setSeccion(s.id)}
+            style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"8px 10px", borderRadius:8,
+              background: seccion===s.id ? "rgba(124,58,237,0.15)" : "transparent",
+              border: seccion===s.id ? "1px solid rgba(124,58,237,0.3)" : "1px solid transparent",
+              cursor:"pointer", fontSize:13, fontWeight: seccion===s.id ? 700 : 500,
+              color: seccion===s.id ? s.color : "#64748b", textAlign:"left", marginBottom:2 }}>
+            <span>{s.icon}</span> {s.label}
+          </button>
+        ))}
+        <div style={{ borderTop:"1px solid #1e1a38", marginTop:12, paddingTop:12 }}>
+          <a href="https://wa.me/5492236339337?text=Hola%2C+necesito+ayuda" target="_blank"
+            style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,
+              background:"rgba(37,211,102,0.1)",border:"1px solid rgba(37,211,102,0.25)",
+              color:"#25D366",fontSize:12,fontWeight:700,textDecoration:"none" }}>
+            💬 Soporte WhatsApp
+          </a>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex:1, minWidth:0 }}>
+        {renderContenido()}
+      </div>
+    </div>
+  );
+};
+
+const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
+  const [mensajesWA, setMensajesWA] = useState([]);
+  const [ocrResultados, setOcrResultados] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fecha, setFecha] = useState(new Date().toISOString().slice(0,10));
+  const [filtro, setFiltro] = useState("all");
+  const [horaDesde, setHoraDesde] = useState("");
+  const [horaHasta, setHoraHasta] = useState("");
+
+  const KEYWORDS_CONFIRMACION = ["cargad", "fichas ya fueron", "acredit", "cargoo", "cargadoo", "ya cargue", "ya te cargue", "listo cargado", "ya está cargado"];
+  const WINDOW_MIN = 30;
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      // WhatsApp messages
+      supabase.from("ext_messages")
+        .select("*")
+        .eq("tenant_id", tid)
+        .eq("message_type", "outgoing")
+        .gte("timestamp", fecha + "T00:00:00")
+        .lte("timestamp", fecha + "T23:59:59")
+        .then(({ data }) => data || []),
+      // OCR results for this day
+      supabase.from("ocr_uso")
+        .select("*")
+        .eq("tenant_id", tid)
+        .gte("created_at", fecha + "T00:00:00")
+        .lte("created_at", fecha + "T23:59:59")
+        .then(({ data }) => (data || []).filter(r => r.imagen_resultado?.es_comprobante))
+    ]).then(([msgs, ocr]) => {
+      setMensajesWA(msgs);
+      setOcrResultados(ocr);
+      setLoading(false);
+    });
   }, [fecha]);
 
   const confirmaciones = mensajesWA.filter(m =>
     KEYWORDS_CONFIRMACION.some(kw => m.message_text?.toLowerCase().includes(kw))
   );
 
-  const txsDia = (allTxsByFecha[fecha] || []).filter(t => t.tipo === "carga");
+  const txsDia = (allTxsByFecha[fecha] || []).filter(t => {
+    if (t.tipo !== "carga") return false;
+    if (horaDesde || horaHasta) {
+      const h = t.hora?.slice(0,5) || "00:00";
+      if (horaDesde && h < horaDesde) return false;
+      if (horaHasta && h > horaHasta) return false;
+    }
+    return true;
+  });
 
+  // OCR comprobantes that have NO matching casino transaction yet = "pendientes"
+  const TIMEOUT_HORAS = 2; // hours before pending becomes suspicious
+  const ocrSinTransaccion = ocrResultados.filter(r => {
+    const res = r.imagen_resultado;
+    if (!res?.monto || res.tipo !== "carga") return false;
+    const rTime = new Date(r.created_at).getTime();
+    const montoOCR = +res.monto || 0;
+    // Check if there's a matching casino transaction
+    const tieneMatch = txsDia.some(tx => {
+      const txTime = new Date(fecha + "T" + (tx.hora || "00:00:00")).getTime();
+      const enRango = Math.abs(rTime - txTime) <= WINDOW_MIN * 60 * 1000;
+      const montosCoinciden = Math.abs(montoOCR - (+tx.monto||0)) / Math.max(+tx.monto||1, 1) < 0.1;
+      return enRango && montosCoinciden;
+    });
+    return !tieneMatch;
+  }).map(r => {
+    const horasEspera = (Date.now() - new Date(r.created_at).getTime()) / 3600000;
+    return {
+      ...r,
+      tipo: "pendiente_ocr",
+      horasEspera: Math.round(horasEspera * 10) / 10,
+      vencido: horasEspera > TIMEOUT_HORAS,
+    };
+  });
+
+  // Casino transactions cross-check (only casino → WA direction)
   const cruce = txsDia.map(tx => {
     const txTime = new Date(fecha + "T" + (tx.hora || "00:00:00")).getTime();
     const jugadorNorm = (tx.jugador || "").toLowerCase().trim();
+    const montoTx = +tx.monto || 0;
 
-    // Cruce por NOMBRE + HORARIO combinados (más preciso)
-    const porNombreYHorario = jugadorNorm.length > 3 ? mensajesWA.find(m => {
+    // Método 1: OCR match
+    // OCR nivel 1: chat_id (username WA) + monto + horario
+    const porOCRNombre = ocrResultados.find(r => {
+      const res = r.imagen_resultado;
+      if (!res?.monto) return false;
+      const mTime = new Date(r.created_at).getTime();
+      if (Math.abs(mTime - txTime) > WINDOW_MIN * 60 * 1000) return false;
+      const montoOCR = +res.monto || 0;
+      if (Math.abs(montoOCR - montoTx) / Math.max(montoTx, 1) >= 0.1) return false;
+      const chatNorm = (r.chat_id || "").toLowerCase().trim();
+      return jugadorNorm.length > 3 && chatNorm.length > 2 &&
+             (chatNorm.includes(jugadorNorm) || jugadorNorm.includes(chatNorm));
+    });
+
+    // OCR nivel 2: solo monto + horario (si no matchea el nombre)
+    const porOCRMonto = !porOCRNombre ? ocrResultados.find(r => {
+      const res = r.imagen_resultado;
+      if (!res?.monto) return false;
+      const mTime = new Date(r.created_at).getTime();
+      if (Math.abs(mTime - txTime) > WINDOW_MIN * 60 * 1000) return false;
+      const montoOCR = +res.monto || 0;
+      return montoOCR > 0 && Math.abs(montoOCR - montoTx) / Math.max(montoTx, 1) < 0.1;
+    }) : null;
+
+    const porOCR = porOCRNombre || porOCRMonto || null;
+
+    // Método 2: WA nombre + horario
+    const porNombreYHorario = !porOCR && jugadorNorm.length > 3 ? mensajesWA.find(m => {
       const mTime = new Date(m.timestamp).getTime();
       const enRango = Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
       if (!enRango) return false;
@@ -1457,19 +2362,21 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
              senderNorm.includes(jugadorNorm) || jugadorNorm.includes(senderNorm);
     }) : null;
 
-    // Cruce solo por horario con mensaje de confirmación (fallback)
-    const porHorario = !porNombreYHorario ? confirmaciones.find(m => {
+    // Método 3: WA solo horario (fallback)
+    const porHorario = !porOCR && !porNombreYHorario ? confirmaciones.find(m => {
       const mTime = new Date(m.timestamp).getTime();
       return Math.abs(mTime - txTime) <= WINDOW_MIN * 60 * 1000;
     }) : null;
 
-    const confirmacion = porNombreYHorario || porHorario || null;
-    const metodo = porNombreYHorario ? "nombre+horario" : porHorario ? "horario" : null;
+    const confirmacion = porOCR || porNombreYHorario || porHorario || null;
+    const metodo = porOCRNombre ? "ocr+nombre" : porOCRMonto ? "ocr+monto" : porNombreYHorario ? "nombre+horario" : porHorario ? "horario" : null;
+    const ocrData = porOCR?.imagen_resultado || null;
 
     return {
       ...tx,
       confirmacion,
       metodo,
+      ocrData,
       estado: confirmacion ? "ok" : "sospechosa",
     };
   });
@@ -1490,25 +2397,36 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
       </div>
 
       <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap", alignItems:"center" }}>
-        <input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setLoading(true); }}
-          style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"8px 12px", fontSize:13 }} />
-        <div style={{ display:"flex", gap:6 }}>
-          {[["all","Todas"],["ok","✅ Verificadas"],["sospechosa","⚠️ Sospechosas"]].map(([v,l]) => (
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setLoading(true); }}
+            style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"8px 12px", fontSize:13 }} />
+          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+            <span style={{ fontSize:12, color:"#64748b" }}>🕐</span>
+            <input type="time" value={horaDesde||""} onChange={e => setHoraDesde(e.target.value)}
+              style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"6px 10px", fontSize:12 }} />
+            <span style={{ fontSize:12, color:"#64748b" }}>—</span>
+            <input type="time" value={horaHasta||""} onChange={e => setHoraHasta(e.target.value)}
+              style={{ background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9", borderRadius:8, padding:"6px 10px", fontSize:12 }} />
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+          {[["all","Todas"],["ok","✅ Verificadas"],["sospechosa","⚠️ Sospechosas"],["pendiente","⏳ Pendientes"]].map(([v,l]) => (
             <button key={v} onClick={() => setFiltro(v)}
               style={{ padding:"7px 14px", borderRadius:8, border:"1px solid", fontSize:12, fontWeight:600, cursor:"pointer",
-                background: filtro===v ? (v==="sospechosa"?"rgba(244,63,94,0.15)":v==="ok"?"rgba(16,185,129,0.15)":"rgba(124,58,237,0.15)") : "transparent",
-                borderColor: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="ok"?"#10b981":"#7c3aed") : "#1e1a38",
-                color: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="ok"?"#10b981":"#a78bfa") : "#64748b" }}>
+                background: filtro===v ? (v==="sospechosa"?"rgba(244,63,94,0.15)":v==="pendiente"?"rgba(245,158,11,0.15)":v==="ok"?"rgba(16,185,129,0.15)":"rgba(124,58,237,0.15)") : "transparent",
+                borderColor: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="pendiente"?"#f59e0b":v==="ok"?"#10b981":"#7c3aed") : "#1e1a38",
+                color: filtro===v ? (v==="sospechosa"?"#f43f5e":v==="pendiente"?"#f59e0b":v==="ok"?"#10b981":"#a78bfa") : "#64748b" }}>
               {l}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20 }}>
         {[
           { label:"Total cargas", v:cruce.length, c:"#f59e0b" },
           { label:"✅ Verificadas", v:ok, c:"#10b981" },
+          { label:"⏳ Pendientes WA", v:ocrSinTransaccion.length, c:"#f59e0b" },
           { label:"⚠️ Sospechosas", v:sospechosas, c:"#f43f5e" },
         ].map(x => (
           <div key={x.label} style={{ background:"#0f0d1f", border:"1px solid #1e1a38", borderRadius:12, padding:"14px 16px" }}>
@@ -1518,15 +2436,51 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
         ))}
       </div>
 
-      {loading ? <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div> : filtradas.length === 0 ? (
+      {/* Pendientes OCR — comprobantes WA sin transaccion en el casino aun */}
+      {(filtro === "all" || filtro === "pendiente") && ocrSinTransaccion.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:13,fontWeight:700,color:"#f59e0b",marginBottom:8 }}>
+            ⏳ Comprobantes WA esperando transacción en el casino
+          </div>
+          <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+            {ocrSinTransaccion.map((r,i) => {
+              const res = r.imagen_resultado;
+              return (
+                <div key={i} style={{ background:"#0f0d1f", border:"1px solid", borderRadius:12, padding:"12px 16px",
+                  borderColor: r.vencido ? "rgba(244,63,94,0.4)" : "rgba(245,158,11,0.3)" }}>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+                    <div>
+                      <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:3 }}>
+                        {r.vencido ? "🚨" : "⏳"} Comprobante OCR — ${res.monto?.toLocaleString()}
+                        {res.jugador && <span style={{ color:"#a78bfa",marginLeft:8 }}>{res.jugador}</span>}
+                      </div>
+                      <div style={{ fontSize:11,color:"#64748b" }}>
+                        {r.chat_id} · {res.banco_origen || ""} · hace {r.horasEspera}h
+                        {r.vencido && <span style={{ color:"#f43f5e",fontWeight:700,marginLeft:8 }}>⚠️ Superó el tiempo de espera</span>}
+                      </div>
+                    </div>
+                    <div style={{ fontSize:11,fontWeight:700,
+                      color: r.vencido ? "#f43f5e" : "#f59e0b" }}>
+                      {r.vencido ? "Sin carga en casino" : "Esperando captura..."}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {loading ? <div style={{ textAlign:"center",padding:40,color:"#64748b" }}>Cargando...</div> : filtradas.length === 0 && filtro !== "pendiente" ? (
         <div style={{ background:"#0f0d1f",border:"1px solid #1e1a38",borderRadius:12,padding:40,textAlign:"center",color:"#64748b" }}>
           No hay cargas para esta fecha
         </div>
-      ) : (
+      ) : filtro !== "pendiente" && (
         <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
           {filtradas.map((c,i) => (
             <div key={i} style={{ background:"#0f0d1f", border:"1px solid", borderRadius:12, padding:"12px 16px",
-              borderColor: c.estado==="ok" ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.3)" }}>
+              borderColor: c.estado==="ok" ? "rgba(16,185,129,0.3)" : "rgba(244,63,94,0.5)",
+              background: c.estado==="sospechosa" ? "rgba(244,63,94,0.05)" : "#0f0d1f" }}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap" }}>
                 <div>
                   <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:4 }}>
@@ -1551,15 +2505,22 @@ const CruceCargas = ({ tid, supabase, fmt, allTxsByFecha }) => {
                 </div>
                 <div style={{ textAlign:"right",flexShrink:0 }}>
                   {c.estado==="ok" ? (
-                    <div style={{ fontSize:11,color:"#10b981",fontWeight:600 }}>
-                      ✅ {c.metodo === "nombre+horario" ? "Verificada · nombre + hora" : "Verificada · solo horario"}
+                    <div style={{ fontSize:11,fontWeight:600,color:"#10b981" }}>
+                      {c.metodo==="ocr" ? "🤖 Verificada · comprobante IA" :
+                       c.metodo==="nombre+horario" ? "✅ Verificada · nombre + hora" :
+                       "✅ Verificada · solo horario"}
                     </div>
                   ) : (
-                    <div style={{ fontSize:11,color:"#f43f5e",fontWeight:600 }}>⚠️ Sin confirmación WA</div>
+                    <div style={{ fontSize:11,color:"#f43f5e",fontWeight:600 }}>🚨 Sin comprobante — SOSPECHOSA</div>
                   )}
                 </div>
               </div>
-              {c.confirmacion && (
+              {c.ocrData && (
+                <div style={{ marginTop:8,background:"rgba(124,58,237,0.05)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#a78bfa" }}>
+                  🤖 Comprobante OCR: ${c.ocrData.monto?.toLocaleString()} · {c.ocrData.banco_origen || "banco"} · confianza {c.ocrData.confianza}
+                </div>
+              )}
+              {!c.ocrData && c.confirmacion && (
                 <div style={{ marginTop:8,background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#94a3b8" }}>
                   💬 "{c.confirmacion.message_text?.slice(0,80)}"
                 </div>
@@ -1830,7 +2791,11 @@ const OwnerDashboard = ({ session, onLogout }) => {
   const [jugSeg, setJugSeg] = useState(null);
   const [jugFiltro, setJugFiltro] = useState("");
   const [jugadorStats, setJugadorStats] = useState([]);
+  const [contactos, setContactos] = useState([]);
+  const [creditos, setCreditos] = useState(null);
+  const [ocrUso, setOcrUso] = useState([]);
   const [iaLoading, setIaLoading] = useState(false);
+  const [vencimiento, setVencimiento] = useState(null);
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaPregunta, setIaPregunta] = useState("");
   const [notificaciones, setNotificaciones] = useState([]);
@@ -1851,6 +2816,124 @@ const OwnerDashboard = ({ session, onLogout }) => {
     setJugadores(jugs); setCampaign(camp); setEmpleados(emps); setCajas(cajs);
     setNotificaciones(notifs || []);
     setJugadorStats(stats || []);
+
+    // Load contactos (username + phone database)
+    const contactosData = await db.getContactos(tid);
+    setContactos(contactosData || []);
+
+    // Load OCR credits
+    const creditosData = await db.getCreditos(tid);
+    setCreditos(creditosData);
+    const ocrUsoData = await db.getOcrUso(tid);
+    setOcrUso(ocrUsoData || []);
+
+    // Load vencimiento
+    const { data: tenantData } = await supabase.from("tenants").select("fecha_vencimiento,plan_activo,plan_nombre").eq("id", tid).single();
+    setVencimiento(tenantData);
+
+    // Check for suspicious cargas and generate notifications (wrapped in try/catch so it never breaks the main load)
+    try {
+    const todayCheck = new Date().toISOString().slice(0,10);
+    const [txsHoyData, msgsHoyData, ocrHoyData] = await Promise.all([
+      // Today's casino transactions
+      Promise.resolve(Object.values(allTxsByFecha[todayCheck] || []).filter(t => t.tipo === "carga")),
+      // Today's WA messages
+      supabase.from("ext_messages").select("*").eq("tenant_id", tid)
+        .gte("timestamp", todayCheck + "T00:00:00").eq("message_type","outgoing")
+        .then(r => r.data || []),
+      // Today's OCR results
+      supabase.from("ocr_uso").select("*").eq("tenant_id", tid)
+        .gte("created_at", todayCheck + "T00:00:00")
+        .then(r => (r.data || []).filter(x => x.imagen_resultado?.es_comprobante))
+    ]);
+
+    const KEYWORDS_CHECK = ["cargad","fichas ya fueron","acredit","cargoo","cargadoo"];
+    const confirmacionesHoy = msgsHoyData.filter(m =>
+      KEYWORDS_CHECK.some(kw => m.message_text?.toLowerCase().includes(kw))
+    );
+    const WINDOW_MS = 30 * 60 * 1000;
+
+    const sospechasHoy = txsHoyData.filter(tx => {
+      const txTime = new Date(todayCheck + "T" + (tx.hora || "00:00:00")).getTime();
+      const jugNorm = (tx.jugador || "").toLowerCase().trim();
+      // Check OCR
+      const tieneOCR = ocrHoyData.some(r => {
+        const mTime = new Date(r.created_at).getTime();
+        return Math.abs(mTime - txTime) <= WINDOW_MS &&
+               Math.abs((+r.imagen_resultado?.monto||0) - (+tx.monto||0)) / Math.max(+tx.monto||1, 1) < 0.1;
+      });
+      if (tieneOCR) return false;
+      // Check WA
+      const tieneWA = jugNorm.length > 3
+        ? msgsHoyData.some(m => {
+            const mTime = new Date(m.timestamp).getTime();
+            if (Math.abs(mTime - txTime) > WINDOW_MS) return false;
+            const cn = (m.chat_id||"").toLowerCase();
+            return cn.includes(jugNorm) || jugNorm.includes(cn);
+          })
+        : confirmacionesHoy.some(m => Math.abs(new Date(m.timestamp).getTime() - txTime) <= WINDOW_MS);
+      return !tieneWA;
+    });
+
+    // Generate notification if there are suspicious cargas
+    // Only flag as sospechosa if there's no OCR comprobante pending for that tx
+    if (sospechasHoy.length > 0) {
+      const existente = (notifs || []).find(n =>
+        n.tipo === "sospechosa" && n.fecha === todayCheck
+      );
+      if (!existente) {
+        await supabase.from("notificaciones").insert({
+          tenant_id: tid,
+          tipo: "sospechosa",
+          fecha: todayCheck,
+          mensaje: `🚨 ${sospechasHoy.length} carga${sospechasHoy.length>1?"s":""} en el casino sin comprobante de pago — posible fraude`,
+          leida: false,
+          datos: JSON.stringify(sospechasHoy.slice(0,5).map(t => ({jugador:t.jugador,monto:t.monto,hora:t.hora}))),
+          created_at: new Date().toISOString()
+        });
+        const { data: newNotifs } = await supabase.from("notificaciones")
+          .select("*").eq("tenant_id", tid).order("created_at",{ascending:false}).limit(20);
+        setNotificaciones(newNotifs || []);
+      }
+    }
+
+    // Notificación: comprobantes OCR sin carga en el casino después de 2 horas
+    const ocrVencidosHoy = ocrHoyData.filter(r => {
+      if (!r.imagen_resultado?.es_comprobante) return false;
+      const horasEspera = (Date.now() - new Date(r.created_at).getTime()) / 3600000;
+      if (horasEspera < 2) return false; // esperar 2 horas antes de alertar
+      const montoOCR = +r.imagen_resultado?.monto || 0;
+      if (!montoOCR) return false;
+      // Check if there's a matching casino transaction
+      return !txsHoyData.some(tx => {
+        const txTime = new Date(todayCheck + "T" + (tx.hora || "00:00:00")).getTime();
+        const rTime = new Date(r.created_at).getTime();
+        return Math.abs(rTime - txTime) <= 30 * 60 * 1000 &&
+               Math.abs(montoOCR - (+tx.monto||0)) / Math.max(+tx.monto||1, 1) < 0.1;
+      });
+    });
+
+    if (ocrVencidosHoy.length > 0) {
+      const existenteOCR = (notifs || []).find(n =>
+        n.tipo === "comprobante_sin_carga" && n.fecha === todayCheck
+      );
+      if (!existenteOCR) {
+        await supabase.from("notificaciones").insert({
+          tenant_id: tid,
+          tipo: "comprobante_sin_carga",
+          fecha: todayCheck,
+          mensaje: `⚠️ ${ocrVencidosHoy.length} comprobante${ocrVencidosHoy.length>1?"s":""} de WhatsApp sin carga correspondiente en el casino`,
+          leida: false,
+          datos: JSON.stringify(ocrVencidosHoy.slice(0,5).map(r => ({chat_id:r.chat_id, monto:r.imagen_resultado?.monto, hora:r.created_at}))),
+          created_at: new Date().toISOString()
+        });
+        const { data: newNotifs } = await supabase.from("notificaciones")
+          .select("*").eq("tenant_id", tid).order("created_at",{ascending:false}).limit(20);
+        setNotificaciones(newNotifs || []);
+      }
+    }
+
+    } catch(e) { console.log("GTP: suspicious check error", e.message); }
 
     // Refresh jugador_stats in background from panel_transactions
     supabase.rpc('refresh_jugador_stats').then(() => {
@@ -2067,9 +3150,30 @@ const OwnerDashboard = ({ session, onLogout }) => {
   // ── Derived ──
   const cmEntries = entries.filter(e => e.fecha?.startsWith(cmk()));
   const pmEntries = entries.filter(e => e.fecha?.startsWith(pmk()));
-  const cmC = sumK(cmEntries, "cargas"), cmR = sumK(cmEntries, "retiros"), cmN = cmC - cmR;
-  const pmC = sumK(pmEntries, "cargas"), pmR = sumK(pmEntries, "retiros"), pmN = pmC - pmR;
-  // Comparacion proporcional: promedio diario del mes anterior × dias cargados del mes actual
+
+  // Use panel_transactions (real casino data) for month totals
+  const txCmC = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(cmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="carga").reduce((a,t)=>a+(+t.monto||0),0), 0);
+  const txCmR = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(cmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="retiro").reduce((a,t)=>a+(+t.monto||0),0), 0);
+  const txPmC = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(pmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="carga").reduce((a,t)=>a+(+t.monto||0),0), 0);
+  const txPmR = Object.entries(allTxsByFecha)
+    .filter(([f]) => f.startsWith(pmk()))
+    .reduce((s,[,txs]) => s + txs.filter(t=>t.tipo==="retiro").reduce((a,t)=>a+(+t.monto||0),0), 0);
+
+  // Use only panel_transactions — no fallback to manual entries
+  const cmC = txCmC;
+  const cmR = txCmR;
+  const pmC = txPmC;
+  const pmR = txPmR;
+  const cmN = cmC - cmR;
+  const pmN = pmC - pmR;
+
+  // Comparacion proporcional
   const cmDias = cmEntries.length;
   const pmDias = pmEntries.length;
   const pmCProp = pmDias > 0 && cmDias > 0 ? (pmC / pmDias) * cmDias : pmC;
@@ -2145,6 +3249,38 @@ const OwnerDashboard = ({ session, onLogout }) => {
 
   if (!config) return <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}><div style={{ textAlign: "center" }}><div style={{ fontSize: 36 }}>🎰</div>Cargando...</div></div>;
 
+  // Check vencimiento
+  const hoy = new Date().toISOString().slice(0,10);
+  const vencido = vencimiento && !vencimiento.plan_activo || (vencimiento?.fecha_vencimiento && vencimiento.fecha_vencimiento < hoy);
+  const diasRestantes = vencimiento?.fecha_vencimiento 
+    ? Math.ceil((new Date(vencimiento.fecha_vencimiento) - new Date()) / 86400000)
+    : null;
+  const porVencer = diasRestantes !== null && diasRestantes <= 5 && diasRestantes > 0;
+
+  // Blocked screen
+  if (vencido) return (
+    <div style={{ ...S.page, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ maxWidth:480, textAlign:"center" }}>
+        <div style={{ fontSize:64, marginBottom:16 }}>🔒</div>
+        <div style={{ fontSize:24, fontWeight:800, color:"#f43f5e", marginBottom:8 }}>Plan vencido</div>
+        <div style={{ color:"#64748b", fontSize:14, marginBottom:24, lineHeight:1.6 }}>
+          Tu plan venció el {vencimiento?.fecha_vencimiento}. Renovalo para seguir usando el panel.
+        </div>
+        <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+renovar+mi+plan+de+Gestiona+tu+Panel"
+          target="_blank" rel="noopener noreferrer"
+          style={{ display:"inline-block", background:"linear-gradient(135deg,#25D366,#128C7E)", color:"white",
+            padding:"14px 28px", borderRadius:12, fontWeight:700, fontSize:15, textDecoration:"none", marginBottom:12 }}>
+          💬 Renovar por WhatsApp
+        </a>
+        <div style={{ color:"#64748b", fontSize:12, marginTop:8 }}>+54 9 2236 33-9337</div>
+        <button onClick={onLogout} style={{ display:"block", margin:"16px auto 0", background:"transparent",
+          border:"1px solid #1e1a38", color:"#64748b", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontSize:12 }}>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+
   const NAV_GROUPS = [
     { id: "inicio",      label: "Inicio",      icon: "◈", items: [
       { id: "resumen", label: "Resumen", desc: "KPIs y gráficos del mes" },
@@ -2168,19 +3304,23 @@ const OwnerDashboard = ({ session, onLogout }) => {
       { id: "ranking",     label: "Ranking",     desc: "Jugadores más activos del mes" },
       { id: "inactivos",   label: "Inactivos",   desc: "Jugadores sin actividad reciente" },
       { id: "horarios",    label: "Horarios",    desc: "Pico de cargas por hora" },
+      { id: "contactos",   label: "Contactos",   desc: "Base de datos usuarios + teléfonos" },
+      { id: "recuperacion", label: "Recuperación",  desc: "Inactivos por prioridad con exportación CSV" },
       { id: "campana",     label: "Campaña",     desc: "Recuperación de jugadores" },
       { id: "ia",          label: "IA Analista", desc: "Análisis inteligente" },
     ]},
     { id: "gestion",     label: "Gestión",     icon: "◇", items: [
       { id: "empleados_hist", label: "Empleados",   desc: "Historial por empleado" },
       { id: "liquidacion",    label: "Liquidación", desc: "Calculadora de sueldos" },
-      { id: "ajustes",        label: "Ajustes",     desc: "Configuración del panel" },
+      { id: "creditos",       label: "Créditos OCR", desc: "Saldo y recargas de créditos" },
     ]},
+
     { id: "comms",        label: "Comunicaciones", icon: "◐", items: [
       { id: "comms_monitor",   label: "Monitor",    desc: "Estado en tiempo real por empleado" },
       { id: "comms_mensajes",  label: "Mensajes",   desc: "Mensajes y tiempos de respuesta" },
       { id: "comms_jugadores", label: "Jugadores",  desc: "Base de jugadores detectados" },
       { id: "rendimiento",     label: "Rendimiento", desc: "Tiempo de respuesta por empleado" },
+      { id: "cargas_ia",      label: "Cargas IA",   desc: "Cargas detectadas por IA en WhatsApp" },
     ]},
   ];
   const activeGroup = NAV_GROUPS.find(g => g.items.some(i => i.id === activeTab));
@@ -2254,6 +3394,22 @@ const OwnerDashboard = ({ session, onLogout }) => {
       <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
       {toast && <div style={{ position: "fixed", top: 20, right: 20, background: "#1e1b3a", border: "1px solid #4c1d95", borderRadius: 12, padding: "12px 20px", fontSize: 14, zIndex: 9999, maxWidth: 320 }}>{toast}</div>}
 
+      {/* Vencimiento warning banner */}
+      {porVencer && (
+        <div style={{ background:"rgba(245,158,11,0.1)", borderBottom:"1px solid rgba(245,158,11,0.3)", padding:"10px 24px",
+          display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+          <div style={{ fontSize:13, color:"#f59e0b", fontWeight:600 }}>
+            ⚠️ Tu plan vence en <b>{diasRestantes} día{diasRestantes !== 1 ? "s" : ""}</b>. Renovalo para no perder el acceso.
+          </div>
+          <a href="https://wa.me/5492236339337?text=Hola%2C+quiero+renovar+mi+plan+de+Gestiona+tu+Panel"
+            target="_blank" rel="noopener noreferrer"
+            style={{ background:"#f59e0b", color:"#000", padding:"6px 14px", borderRadius:8,
+              fontWeight:700, fontSize:12, textDecoration:"none", flexShrink:0 }}>
+            Renovar ahora
+          </a>
+        </div>
+      )}
+
       <div style={{ background: "rgba(8,6,18,0.95)", borderBottom: "1px solid rgba(124,58,237,0.15)", padding: "14px 24px 0", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100, boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div>
@@ -2295,8 +3451,56 @@ const OwnerDashboard = ({ session, onLogout }) => {
           {NAV_GROUPS.map(group => (
             <NavGroup key={group.id} group={group} activeTab={activeTab} setActiveTab={setActiveTab} />
           ))}
+          {/* IA y OCR destacados en la nav */}
+          <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6, paddingBottom:6, paddingTop:4 }}>
+            <button onClick={() => { setActiveTab("ia"); }}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="ia" ? "rgba(124,58,237,0.25)" : "transparent",
+                border: activeTab==="ia" ? "1px solid #7c3aed" : "1px solid rgba(124,58,237,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color:"#a78bfa",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              🤖 IA Analista
+            </button>
+            <button onClick={() => { setActiveTab("creditos"); }}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="creditos" ? "rgba(245,158,11,0.2)" : "transparent",
+                border: activeTab==="creditos" ? "1px solid #f59e0b" : "1px solid rgba(245,158,11,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color:"#f59e0b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              ⚡ {creditos && creditos.plan !== "unlimited" ? `OCR (${creditos.creditos_disponibles})` : "OCR"}
+            </button>
+            <button onClick={() => setActiveTab("ajustes")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="ajustes" ? "rgba(100,116,139,0.2)" : "transparent",
+                border: activeTab==="ajustes" ? "1px solid #64748b" : "1px solid rgba(100,116,139,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="ajustes" ? "#f1f5f9" : "#64748b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              ⚙️ Ajustes
+            </button>
+            <button onClick={() => setActiveTab("celulares")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="celulares" ? "rgba(16,185,129,0.2)" : "transparent",
+                border: activeTab==="celulares" ? "1px solid #10b981" : "1px solid rgba(16,185,129,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="celulares" ? "#10b981" : "#64748b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              📱 Celulares
+            </button>
+            <button onClick={() => setActiveTab("ayuda")}
+              style={{ display:"flex", alignItems:"center", gap:5, padding:"5px 12px",
+                background: activeTab==="ayuda" ? "rgba(6,182,212,0.2)" : "transparent",
+                border: activeTab==="ayuda" ? "1px solid #06b6d4" : "1px solid rgba(6,182,212,0.25)",
+                borderRadius:20, cursor:"pointer",
+                fontSize:11, fontWeight:700, color: activeTab==="ayuda" ? "#06b6d4" : "#64748b",
+                transition:"all 150ms", whiteSpace:"nowrap" }}>
+              📖 Ayuda
+            </button>
+          </div>
           {activeGroup && (
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 2, paddingBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 2, paddingBottom: 4 }}>
               {activeGroup.items.map(item => {
                 const isActive = activeTab === item.id;
                 return (
@@ -2515,23 +3719,39 @@ const OwnerDashboard = ({ session, onLogout }) => {
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {filtrados.map(j => {
                         const stats = getJugStats(j.nombre);
+                        // Look up phone from contactos table
+                        const contacto = contactos.find(c => c.username?.toLowerCase() === j.nombre?.toLowerCase());
+                        const telefono = j.telefono || contacto?.telefono || null;
                         return (
                           <div key={j.nombre} style={{ background: "rgba(8,6,18,0.7)", border: "1px solid #1e1e38", borderRadius: 12, padding: "13px 16px" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                              <div>
+                              <div style={{ flex:1 }}>
                                 <div style={{ fontWeight: 600, color: "#f1f5f9", fontSize: 14 }}>👤 {j.nombre}</div>
                                 <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
                                   Primera vez: {j.primera_vez || "—"} · {stats.cant_cargas || 0} carga{(stats.cant_cargas || 0) !== 1 ? "s" : ""} este mes · máx: {fmt(stats.max_carga || 0)}
-                                  {j.telefono ? ` · 📱 ${j.telefono}` : ""}
                                 </div>
-                              </div>
-                              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                                {j.telefono ? (
-                                  <span style={{ fontSize: 12, color: "#10b981" }}>📱 {j.telefono}</span>
-                                ) : (
-                                  <input type="text" placeholder="+ teléfono" style={{ ...S.input, width: 130, fontSize: 12, padding: "6px 10px" }}
-                                    onBlur={async e => { if (e.target.value) { await supabase.from("jugadores").update({ telefono: e.target.value }).eq("tenant_id", tid).eq("nombre", j.nombre); loadAll(); } }} />
+                                {telefono && (
+                                  <div style={{ fontSize:12, color:"#10b981", marginTop:4 }}>📱 {telefono}</div>
                                 )}
+                              </div>
+                              <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink:0 }}>
+                                {!telefono && (
+                                  <input type="text" placeholder="+ teléfono" style={{ ...S.input, width: 130, fontSize: 12, padding: "6px 10px" }}
+                                    onBlur={async e => {
+                                      if (e.target.value) {
+                                        await db.upsertContacto({tenant_id:tid, username:j.nombre, telefono:e.target.value, total_cargas:stats.total_cargas||0});
+                                        setContactos(prev => {
+                                          const exists = prev.find(c => c.username === j.nombre);
+                                          if (exists) return prev.map(c => c.username===j.nombre ? {...c,telefono:e.target.value} : c);
+                                          return [...prev, {username:j.nombre, telefono:e.target.value, tenant_id:tid}];
+                                        });
+                                      }
+                                    }} />
+                                )}
+                                <div style={{ textAlign:"right" }}>
+                                  <div style={{ fontWeight:700, color:"#f59e0b", fontSize:14 }}>{fmt(stats.total_cargas||0)}</div>
+                                  <div style={{ fontSize:10, color:"#64748b" }}>total mes</div>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2748,6 +3968,256 @@ const OwnerDashboard = ({ session, onLogout }) => {
           </div>
         )}
 
+        {activeTab === "contactos" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#06b6d4,#0891b2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📋</div>
+              <div style={{ flex:1 }}>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#06b6d4" }}>Contactos de Jugadores</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Base de datos: usuario del casino + número de WhatsApp</p>
+              </div>
+              <div style={{ ...S.badge, background:"rgba(6,182,212,0.15)", color:"#06b6d4" }}>{contactos.length} jugadores</div>
+            </div>
+
+            {(() => {
+              const [busq, setBusq] = React.useState("");
+              const [editando, setEditando] = React.useState(null);
+              const [telefEdit, setTelefEdit] = React.useState("");
+
+              const filtrados = contactos.filter(c =>
+                !busq || c.username?.toLowerCase().includes(busq.toLowerCase()) ||
+                c.telefono?.includes(busq) || c.nombre_real?.toLowerCase().includes(busq.toLowerCase())
+              );
+
+              const guardarTelefono = async (c) => {
+                await db.upsertContacto({ ...c, telefono: telefEdit, updated_at: new Date().toISOString() });
+                setContactos(prev => prev.map(x => x.username === c.username ? {...x, telefono: telefEdit} : x));
+                setEditando(null);
+              };
+
+              return (
+                <div>
+                  <div style={{ marginBottom:16 }}>
+                    <input
+                      placeholder="🔍 Buscar por usuario, teléfono o nombre..."
+                      value={busq} onChange={e => setBusq(e.target.value)}
+                      style={{ width:"100%", background:"#0f0d1f", border:"1px solid #1e1a38", color:"#f1f5f9",
+                        borderRadius:10, padding:"10px 16px", fontSize:13, outline:"none" }}
+                    />
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                    {filtrados.slice(0,100).map(c => (
+                      <div key={c.username} style={{ ...S.card, display:"flex", alignItems:"center", gap:12, padding:"10px 14px" }}>
+                        <div style={{ width:36,height:36,borderRadius:10,background:"rgba(124,58,237,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0 }}>
+                          👤
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontWeight:700,fontSize:13,color:"#f1f5f9" }}>{c.username}</div>
+                          {c.nombre_real && <div style={{ fontSize:11,color:"#64748b" }}>{c.nombre_real}</div>}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          {editando === c.username ? (
+                            <div style={{ display:"flex", gap:6 }}>
+                              <input value={telefEdit} onChange={e => setTelefEdit(e.target.value)}
+                                placeholder="+54911..." style={{ flex:1, background:"#0f0d1f", border:"1px solid #7c3aed",
+                                color:"#f1f5f9", borderRadius:6, padding:"4px 8px", fontSize:12 }} />
+                              <button onClick={() => guardarTelefono(c)}
+                                style={{ background:"#10b981", border:"none", color:"white", borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer" }}>✓</button>
+                              <button onClick={() => setEditando(null)}
+                                style={{ background:"#1e1a38", border:"none", color:"#64748b", borderRadius:6, padding:"4px 8px", fontSize:11, cursor:"pointer" }}>✕</button>
+                            </div>
+                          ) : (
+                            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                              {c.telefono
+                                ? <span style={{ fontSize:12,color:"#10b981",fontFamily:"monospace" }}>📱 {c.telefono}</span>
+                                : <span style={{ fontSize:11,color:"#f43f5e" }}>Sin teléfono</span>
+                              }
+                              <button onClick={() => { setEditando(c.username); setTelefEdit(c.telefono||""); }}
+                                style={{ background:"transparent", border:"1px solid #1e1a38", color:"#64748b", borderRadius:6,
+                                  padding:"2px 8px", fontSize:10, cursor:"pointer" }}>✏️</button>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign:"right", flexShrink:0 }}>
+                          <div style={{ fontSize:12,fontWeight:700,color:"#f59e0b" }}>{fmt(c.total_cargas||0)}</div>
+                          <div style={{ fontSize:10,color:"#64748b" }}>total cargas</div>
+                        </div>
+                      </div>
+                    ))}
+                    {filtrados.length > 100 && (
+                      <div style={{ textAlign:"center", color:"#64748b", fontSize:12, padding:10 }}>
+                        Mostrando 100 de {filtrados.length} — usá el buscador para filtrar
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {activeTab === "recuperacion" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#f43f5e,#be123c)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>📣</div>
+              <div style={{ flex:1 }}>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#f43f5e" }}>Recuperación de Jugadores</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Inactivos ordenados por prioridad — exportá a CSV para campañas</p>
+              </div>
+            </div>
+            {(() => {
+              const [diasInactivo, setDiasInactivo] = React.useState(15);
+              const [soloConTel, setSoloConTel] = React.useState(false);
+
+              // Get last activity per player from transactions
+              const ultimaActividad = {};
+              Object.entries(allTxsByFecha).forEach(([fecha, txs]) => {
+                txs.forEach(tx => {
+                  if (!tx.jugador) return;
+                  if (!ultimaActividad[tx.jugador] || fecha > ultimaActividad[tx.jugador].fecha) {
+                    ultimaActividad[tx.jugador] = { fecha, monto: +tx.monto || 0 };
+                  }
+                });
+              });
+
+              const cutoff = new Date();
+              cutoff.setDate(cutoff.getDate() - diasInactivo);
+              const cutoffStr = cutoff.toISOString().slice(0,10);
+
+              // Build inactivos list with priority score
+              const inactivos = Object.entries(ultimaActividad)
+                .filter(([j, d]) => d.fecha < cutoffStr)
+                .map(([jugador, d]) => {
+                  const stats = getJugStats(jugador);
+                  const contacto = contactos.find(c => c.username?.toLowerCase() === jugador?.toLowerCase());
+                  const telefono = contacto?.telefono || null;
+                  const diasSinJugar = Math.floor((new Date() - new Date(d.fecha)) / 86400000);
+                  // Priority: higher total cargas = higher priority
+                  const prioridad = stats.total_cargas || 0;
+                  return { jugador, ultimaFecha: d.fecha, diasSinJugar, telefono, prioridad, stats, contacto };
+                })
+                .filter(j => !soloConTel || j.telefono)
+                .sort((a,b) => b.prioridad - a.prioridad);
+
+              const exportCSV = () => {
+                const rows = [
+                  ["Usuario", "Teléfono", "Días sin jugar", "Última actividad", "Total cargas histórico", "Cargas este mes", "Prioridad"],
+                  ...inactivos.map(j => [
+                    j.jugador,
+                    j.telefono || "",
+                    j.diasSinJugar,
+                    j.ultimaFecha,
+                    j.stats?.total_cargas || 0,
+                    j.stats?.cant_cargas || 0,
+                    j.prioridad > 50000 ? "ALTA" : j.prioridad > 10000 ? "MEDIA" : "BAJA"
+                  ])
+                ];
+                const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+                const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = `recuperacion_${new Date().toISOString().slice(0,10)}.csv`;
+                a.click(); URL.revokeObjectURL(url);
+              };
+
+              const alta = inactivos.filter(j => j.prioridad > 50000).length;
+              const media = inactivos.filter(j => j.prioridad > 10000 && j.prioridad <= 50000).length;
+              const baja = inactivos.filter(j => j.prioridad <= 10000).length;
+              const conTel = inactivos.filter(j => j.telefono).length;
+
+              return (
+                <div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:10, marginBottom:16 }}>
+                    <div style={{ ...S.card }}>
+                      <div style={{ fontSize:12,color:"#64748b",marginBottom:8 }}>⚙️ Configuración</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                        <span style={{ fontSize:12,color:"#94a3b8" }}>Inactivos hace más de</span>
+                        <input type="number" value={diasInactivo} onChange={e=>setDiasInactivo(+e.target.value)}
+                          style={{ width:60,background:"#0f0d1f",border:"1px solid #1e1a38",color:"#f1f5f9",borderRadius:6,padding:"4px 8px",fontSize:13,textAlign:"center" }} />
+                        <span style={{ fontSize:12,color:"#94a3b8" }}>días</span>
+                      </div>
+                      <label style={{ display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#94a3b8",cursor:"pointer" }}>
+                        <input type="checkbox" checked={soloConTel} onChange={e=>setSoloConTel(e.target.checked)} />
+                        Solo con teléfono cargado
+                      </label>
+                    </div>
+                    <div style={{ ...S.card }}>
+                      <div style={{ fontSize:12,color:"#64748b",marginBottom:8 }}>📊 Resumen</div>
+                      <div style={{ display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6 }}>
+                        {[
+                          {l:"Total inactivos",v:inactivos.length,c:"#f43f5e"},
+                          {l:"Con teléfono",v:conTel,c:"#10b981"},
+                          {l:"Prioridad alta",v:alta,c:"#f43f5e"},
+                          {l:"Prioridad media",v:media,c:"#f59e0b"},
+                        ].map(x=>(
+                          <div key={x.l} style={{ background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 10px" }}>
+                            <div style={{ fontSize:9,color:"#64748b" }}>{x.l}</div>
+                            <div style={{ fontSize:18,fontWeight:800,color:x.c }}>{x.v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display:"flex",gap:10,marginBottom:16 }}>
+                    <button onClick={exportCSV}
+                      style={{ background:"linear-gradient(135deg,#10b981,#059669)",border:"none",color:"white",
+                        padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8 }}>
+                      📥 Exportar CSV ({inactivos.length} jugadores)
+                    </button>
+                    {conTel < inactivos.length && (
+                      <button onClick={exportCSV}
+                        style={{ background:"rgba(6,182,212,0.15)",border:"1px solid rgba(6,182,212,0.3)",color:"#06b6d4",
+                          padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer" }}
+                        onClick={() => { setSoloConTel(true); setTimeout(exportCSV, 100); }}>
+                        📱 Solo con teléfono ({conTel})
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                    {inactivos.slice(0,50).map(j => {
+                      const prioLabel = j.prioridad > 50000 ? {l:"ALTA",c:"#f43f5e",bg:"rgba(244,63,94,0.1)"} :
+                                        j.prioridad > 10000 ? {l:"MEDIA",c:"#f59e0b",bg:"rgba(245,158,11,0.1)"} :
+                                        {l:"BAJA",c:"#64748b",bg:"rgba(100,116,139,0.1)"};
+                      return (
+                        <div key={j.jugador} style={{ ...S.card, display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
+                          borderColor: j.prioridad>50000?"rgba(244,63,94,0.25)":"#1e1a38" }}>
+                          <div style={{ padding:"3px 10px",borderRadius:20,background:prioLabel.bg,
+                            color:prioLabel.c,fontSize:10,fontWeight:700,flexShrink:0 }}>
+                            {prioLabel.l}
+                          </div>
+                          <div style={{ flex:1,minWidth:0 }}>
+                            <div style={{ fontWeight:700,fontSize:13,color:"#f1f5f9" }}>{j.jugador}</div>
+                            <div style={{ fontSize:11,color:"#64748b" }}>
+                              Sin jugar hace {j.diasSinJugar} días · última vez {j.ultimaFecha}
+                            </div>
+                          </div>
+                          <div style={{ flexShrink:0,textAlign:"center" }}>
+                            {j.telefono
+                              ? <div style={{ fontSize:12,color:"#10b981",fontFamily:"monospace" }}>📱 {j.telefono}</div>
+                              : <div style={{ fontSize:11,color:"#f43f5e" }}>Sin teléfono</div>
+                            }
+                          </div>
+                          <div style={{ textAlign:"right",flexShrink:0 }}>
+                            <div style={{ fontSize:13,fontWeight:700,color:"#f59e0b" }}>{fmt(j.prioridad)}</div>
+                            <div style={{ fontSize:10,color:"#64748b" }}>total histórico</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {inactivos.length > 50 && (
+                      <div style={{ textAlign:"center",color:"#64748b",fontSize:12,padding:10 }}>
+                        Mostrando top 50 — exportá el CSV para ver todos los {inactivos.length}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {activeTab === "campana" && (
           <div>
             <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 6, color: "#c4b5fd" }}>📣 Campaña de Recuperación</h2>
@@ -2855,9 +4325,9 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   { label: "Neto del mes", v: fmt(cmN) },
                   { label: "Jugadores activos", v: cmUnicos },
                   { label: "Alertas de caja", v: alertas.length },
-                  { label: "Msgs WA hoy", v: commsData?.totalHoy || "—" },
-                  { label: "Alertas WA", v: commsData?.alertasActivas || "—" },
-                  { label: "Resp. promedio", v: commsData?.avgResp ? Math.floor(commsData.avgResp/60)+"m" : "—" },
+                  { label: "Msgs WA hoy", v: "—" },
+                  { label: "Alertas WA", v: alertas?.filter(a=>!a.leida).length || 0 },
+                  { label: "Resp. promedio", v: "—" },
                   { label: "Sospechosas", v: "ver cruce" },
                 ].map(x => (
                   <div key={x.label} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
@@ -2877,7 +4347,7 @@ const OwnerDashboard = ({ session, onLogout }) => {
                   onChange={e => setIaPregunta(e.target.value)}
                   placeholder='Ej: "¿Qué días rinden más?" o "¿Hay algo raro en caja?"'
                   style={{ ...S.input, flex: 1, fontSize: 13 }}
-                  onKeyDown={e => e.key === "Enter" && !iaLoading && (() => {
+                  onKeyDown={e => e.key === "Enter" && !iaLoading && (async () => {
                     setIaLoading(true);
                     setIaAnalisis(null);
                     const mesesData = {};
@@ -3248,6 +4718,10 @@ const OwnerDashboard = ({ session, onLogout }) => {
           </div>
         )}
 
+        {activeTab === "cargas_ia" && (
+          <CargasIA tid={tid} supabase={supabase} fmt={fmt} />
+        )}
+
         {activeTab === "empleados_hist" && (
           <div>
             <h2 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 20, color: "#a78bfa" }}>👤 Historial por Empleado</h2>
@@ -3313,6 +4787,141 @@ const OwnerDashboard = ({ session, onLogout }) => {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "creditos" && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0 }}>⚡</div>
+              <div style={{ flex:1 }}>
+                <h2 style={{ fontSize:20,fontWeight:800,margin:0,color:"#f59e0b" }}>Créditos OCR</h2>
+                <p style={{ color:"#64748b",fontSize:12,margin:"3px 0 0" }}>Análisis automático de comprobantes con inteligencia artificial</p>
+              </div>
+            </div>
+
+            {creditos ? (
+              <div>
+                {/* Saldo actual */}
+                <div style={{ ...S.card, background:"linear-gradient(135deg,rgba(245,158,11,0.1),rgba(217,119,6,0.05))", borderColor:"rgba(245,158,11,0.3)", marginBottom:16 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:16 }}>
+                    <div>
+                      <div style={{ fontSize:12,color:"#64748b",marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em" }}>Créditos disponibles</div>
+                      <div style={{ fontSize:48,fontWeight:800,color:"#f59e0b",lineHeight:1 }}>
+                        {creditos.plan === "unlimited" ? "∞" : creditos.creditos_disponibles?.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize:12,color:"#64748b",marginTop:4 }}>
+                        {creditos.plan === "unlimited" ? "Plan ilimitado" : `Usados hoy: ${creditos.creditos_usados_hoy || 0}`}
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ display:"inline-block",background:"rgba(124,58,237,0.15)",border:"1px solid rgba(124,58,237,0.3)",color:"#a78bfa",padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,marginBottom:8 }}>
+                        Plan {creditos.plan?.toUpperCase()}
+                      </div>
+                      <div style={{ fontSize:11,color:"#64748b" }}>1 crédito = 1 imagen analizada</div>
+                    </div>
+                  </div>
+
+                  {creditos.plan !== "unlimited" && (
+                    <div style={{ marginTop:16 }}>
+                      <div style={{ background:"rgba(0,0,0,0.2)",borderRadius:100,height:8 }}>
+                        <div style={{ background:"linear-gradient(90deg,#f59e0b,#fbbf24)",borderRadius:100,height:8,
+                          width:`${Math.min(100,(creditos.creditos_disponibles||0)/1000*100)}%`,transition:"width 0.8s" }} />
+                      </div>
+                      <div style={{ display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b",marginTop:4 }}>
+                        <span>{creditos.creditos_disponibles} restantes</span>
+                        <span>1.000 créditos = $10 USD/día</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Planes de recarga */}
+                <div style={{ fontSize:14,fontWeight:700,color:"#f1f5f9",marginBottom:12 }}>💳 Recargar créditos</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:20 }}>
+                  {[
+                    { nombre:"Básico", creditos:500, precio_usd:3, precio_ars:"$3 USD", desc:"~500 imágenes/día", color:"#06b6d4" },
+                    { nombre:"Estándar", creditos:1500, precio_usd:6, precio_ars:"$6 USD", desc:"~1.500 imágenes/día", color:"#7c3aed", popular:true },
+                    { nombre:"Pro", creditos:2500, precio_usd:10, precio_ars:"$10 USD", desc:"~2.500 imágenes/día", color:"#f59e0b" },
+                    { nombre:"Ilimitado/día", creditos:99999, precio_usd:12, precio_ars:"$12 USD/día", desc:"Sin límite diario", color:"#10b981" },
+                  ].map(plan => (
+                    <div key={plan.nombre} style={{ ...S.card, border:`1px solid ${plan.color}40`, background:`${plan.color}08`, position:"relative" }}>
+                      {plan.popular && (
+                        <div style={{ position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",
+                          background:plan.color,color:"white",fontSize:10,fontWeight:700,padding:"2px 10px",borderRadius:20 }}>
+                          MÁS ELEGIDO
+                        </div>
+                      )}
+                      <div style={{ fontWeight:700,fontSize:14,color:"#f1f5f9",marginBottom:4 }}>{plan.nombre}</div>
+                      <div style={{ fontSize:24,fontWeight:800,color:plan.color,marginBottom:2 }}>{plan.precio_ars}</div>
+                      <div style={{ fontSize:11,color:"#64748b",marginBottom:12 }}>{plan.desc}</div>
+                      <button
+                        onClick={() => {
+                          // Generate MercadoPago payment link
+                          const msg = `Hola! Quiero recargar el plan ${plan.nombre} (${plan.creditos} créditos) para mi panel. Tenant: ${tid}`;
+                          window.open(`https://wa.me/5492236339337?text=${encodeURIComponent(msg)}`, "_blank");
+                        }}
+                        style={{ width:"100%",background:plan.color,border:"none",color:"white",padding:"10px",
+                          borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer" }}>
+                        Recargar →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Uso reciente */}
+                <div style={{ fontSize:14,fontWeight:700,color:"#f1f5f9",marginBottom:12 }}>📊 Uso últimos 7 días</div>
+                {ocrUso.length === 0 ? (
+                  <div style={{ ...S.card, textAlign:"center", color:"#64748b", padding:30 }}>
+                    No hay imágenes procesadas todavía. Instalá la extensión para empezar.
+                  </div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                    {ocrUso.slice(0,20).map((u,i) => {
+                      const r = u.imagen_resultado || {};
+                      return (
+                        <div key={i} style={{ ...S.card, display:"flex", alignItems:"center", gap:12, padding:"10px 14px" }}>
+                          <div style={{ fontSize:18 }}>
+                            {r.es_comprobante ? (r.tipo==="carga"?"💰":r.tipo==="retiro"?"💸":"📄") : "🖼️"}
+                          </div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:12,fontWeight:600,color:"#f1f5f9" }}>
+                              {r.es_comprobante ? `${r.tipo==="carga"?"Carga":"Retiro"} detectada — $${r.monto?.toLocaleString()||"?"}` : "Imagen no identificada como comprobante"}
+                            </div>
+                            <div style={{ fontSize:10,color:"#64748b" }}>
+                              {u.chat_id} · {new Date(u.created_at).toLocaleString("es-AR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}
+                              {r.confianza && ` · Confianza: ${r.confianza}`}
+                            </div>
+                          </div>
+                          <div style={{ fontSize:10,color:"#64748b",textAlign:"right" }}>
+                            {u.tokens_usados} tokens
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Info */}
+                <div style={{ ...S.card, marginTop:16, background:"rgba(6,182,212,0.05)", borderColor:"rgba(6,182,212,0.2)", fontSize:12, color:"#64748b" }}>
+                  💡 <b>¿Cómo funciona?</b> La extensión detecta automáticamente las imágenes de comprobantes que mandan los clientes por WhatsApp. Claude Haiku analiza cada imagen e identifica si es una carga o retiro, el monto y el banco. Cada imagen analizada consume 1 crédito.
+                </div>
+              </div>
+            ) : (
+              <div style={{ ...S.card, textAlign:"center", padding:40, color:"#64748b" }}>
+                <div style={{ fontSize:32,marginBottom:12 }}>⚡</div>
+                <div style={{ fontWeight:700,color:"#f1f5f9",marginBottom:8 }}>OCR no configurado</div>
+                <div>Contactá al administrador para activar el análisis de imágenes.</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "celulares" && (
+          <Celulares tid={tid} supabase={supabase} fmt={fmt} />
+        )}
+
+        {activeTab === "ayuda" && (
+          <AyudaManual setActiveTab={setActiveTab} />
         )}
 
         {activeTab === "ajustes" && (
